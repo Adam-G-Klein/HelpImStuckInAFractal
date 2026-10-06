@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://src/fractal/fractal_view.tscn" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://src/camera/fly_camera.gd" id="4"]
 [ext_resource type="Script" path="res://src/perf/resolution_governor.gd" id="5"]
 [ext_resource type="Script" path="res://src/camera/orbit_camera.gd" id="6"]
+[ext_resource type="Script" path="res://src/camera/julia_marker.gd" id="7"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1")
@@ -22,3 +23,11 @@ script = ExtResource("5")
 script = ExtResource("6")
 
 [node name="ControlsPanel" parent="." instance=ExtResource("3")]
+
+[node name="JuliaMarker" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("7")

@@ -11,8 +11,8 @@ var camera: CameraState
 @onready var governor: ResolutionGovernor = $ResolutionGovernor
 @onready var fly: FlyCamera = $FlyCamera
 
-var _orbit  # OrbitCamera, added in Task 11 (untyped so main.gd parses before it exists)
-var _marker  # JuliaMarker, added in Task 12 (untyped so main.gd parses before it exists)
+var _orbit: OrbitCamera
+var _marker: JuliaMarker
 var _last_mode := -1
 
 
