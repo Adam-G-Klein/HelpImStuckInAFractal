@@ -29,6 +29,14 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	resized.connect(_apply_size)
 	_apply_size()
+	# setup() may have run before _ready wired the material (e.g. a test or the
+	# screenshot pass that adds the view and calls setup() in the same frame).
+	# Push whatever state is already held so the first frame is not blank.
+	if _params != null:
+		_push_params()
+	if _camera != null:
+		_push_camera()
+	request_frame()
 
 
 func setup(params: FractalParams, camera: CameraState) -> void:
