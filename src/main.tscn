@@ -1,10 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://src/fractal/fractal_view.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://src/ui/controls_panel.tscn" id="3"]
 [ext_resource type="Script" path="res://src/camera/fly_camera.gd" id="4"]
 [ext_resource type="Script" path="res://src/perf/resolution_governor.gd" id="5"]
+[ext_resource type="Script" path="res://src/camera/orbit_camera.gd" id="6"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1")
@@ -16,5 +17,8 @@ script = ExtResource("4")
 
 [node name="ResolutionGovernor" type="Node" parent="."]
 script = ExtResource("5")
+
+[node name="OrbitCamera" type="Node" parent="."]
+script = ExtResource("6")
 
 [node name="ControlsPanel" parent="." instance=ExtResource("3")]
