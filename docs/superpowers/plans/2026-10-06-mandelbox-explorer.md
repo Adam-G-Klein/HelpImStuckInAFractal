@@ -3026,7 +3026,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 **Files:**
 - Create: `README.md`
 
-- [ ] **Step 1: Write `README.md`**
+- [x] **Step 1: Write `README.md`**
 
 Cover: what this is (a from-scratch Godot 4.6 Mandelbox viewer emulating
 icefractal.com/mandelbox/, web-exportable); how to run (`./run.sh`,
@@ -3038,12 +3038,12 @@ up, fractal coordinates = 2× the site's); how to test
 lives (`docs/reference/icefractal-default.jpg`) for side-by-side eyeballing.
 No code snippets required; prose and a table.
 
-- [ ] **Step 2: Verify it renders**
+- [x] **Step 2: Verify it renders**
 
 Run: `godot4 --headless --import --path . >/dev/null 2>&1` (sanity) and read the
 file back; no test. Confirm the control list and key table match the spec.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md
@@ -3063,7 +3063,7 @@ exporting to the git-ignored `build/web/`.
 - Create: `export_presets.cfg`
 - Modify: `.gitignore` (add `build/` and `tests/out/`)
 
-- [ ] **Step 1: Add ignores to `.gitignore`**
+- [x] **Step 1: Add ignores to `.gitignore`**
 
 Append:
 
@@ -3073,7 +3073,7 @@ build/
 tests/out/
 ```
 
-- [ ] **Step 2: Create `export_presets.cfg`**
+- [x] **Step 2: Create `export_presets.cfg`**
 
 ```ini
 [preset.0]
@@ -3110,7 +3110,7 @@ html/experimental_virtual_keyboard=false
 progressive_web_app/enabled=false
 ```
 
-- [ ] **Step 3: Verify the preset loads**
+- [x] **Step 3: Verify the preset loads**
 
 Run: `mkdir -p build/web && godot4 --headless --path . --export-release Web build/web/index.html`
 (The output directory must exist first, or the export errors before it even
@@ -3125,7 +3125,7 @@ Expected one of:
 
 > Do not attempt to download templates or change editor settings to install them.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add export_presets.cfg .gitignore
@@ -3144,18 +3144,18 @@ verifies and, if needed, fixes regressions surfaced here.
 
 **Files:** none created; fixes (if any) go to the file at fault with its own test.
 
-- [ ] **Step 1: Full headless suite**
+- [x] **Step 1: Full headless suite**
 
 Run (Bash tool `timeout: 600000`): `tests/run_all.sh`
 Expected: every `tests/*_test.gd` prints `PASSED`; the script exits 0. If any
 test fails, stop and fix it (with a failing test first) before continuing.
 
-- [ ] **Step 2: Windowed screenshot check**
+- [x] **Step 2: Windowed screenshot check**
 
 Run: `tests/screenshots.sh`
 Expected: all `PASS`, exit 0; `screenshots/default_view.png` written.
 
-- [ ] **Step 3: Eyeball the default view**
+- [x] **Step 3: Eyeball the default view**
 
 Open `screenshots/default_view.png` and `docs/reference/icefractal-default.jpg`
 side by side. Confirm: a cube-bounded, predominantly blue Mandelbox with the
@@ -3163,20 +3163,20 @@ same gross structure (the big round "porthole" faces, the fractal dust at the
 corners). Exact pixels will differ (float32, no HiDPI); the shape and colour
 family should match. Note any gross mismatch in the final report.
 
-- [ ] **Step 4: Web export**
+- [x] **Step 4: Web export**
 
 Run: `mkdir -p build/web && godot4 --headless --path . --export-release Web build/web/index.html`
 Expected: either the files are written to `build/web/`, or the output reports
 missing export templates. **If templates are missing, report that fact — do not
 fail the task.**
 
-- [ ] **Step 5: Confirm the git state**
+- [x] **Step 5: Confirm the git state**
 
 Run: `git status` and `git log --oneline -20`
 Expected: a clean tree (only `build/` and `tests/out/` present and ignored) and
 one commit per task. **Do not push, merge, or open a PR.**
 
-- [ ] **Step 6: Report ready**
+- [x] **Step 6: Report ready**
 
 Tell Adam the project is complete and committed on `main`, that the headless
 suite and windowed check pass, how the default view compares to the reference,
