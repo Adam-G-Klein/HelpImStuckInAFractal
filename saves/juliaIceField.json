@@ -1,0 +1,38 @@
+{
+	"version": 1,
+	"fractal": {
+		"scale": -2.29,
+		"inner_radius": 0.0,
+		"fold_limit": 0.72,
+		"outer_radius": 0.29,
+		"color_mode": 1,
+		"precision": 0.00002,
+		"julia_enabled": true,
+		"julia_point": [
+			-0.23,
+			1.512,
+			1.892
+		],
+		"fast_controls": true,
+		"camera_mode": "fly",
+		"mouse_sensitivity": 0.1
+	},
+	"camera": {
+		"eye": [
+			8.175847,
+			3.81246,
+			3.283393
+		],
+		"forward": [
+			-0.8516508,
+			-0.3971313,
+			-0.3420201
+		],
+		"up": [
+			-0.3099755,
+			-0.1445439,
+			0.9396927
+		],
+		"speed_factor": 1.0
+	}
+}
