@@ -52,6 +52,8 @@ func shader_uniform_names() -> Array:
 
 
 func viewport_size() -> Vector2i:
+	if _viewport == null:
+		return Vector2i.ZERO
 	return _viewport.size
 
 
@@ -61,6 +63,8 @@ func set_render_scale(s: float) -> void:
 
 
 func request_frame() -> void:
+	if _viewport == null:
+		return  # setup() may run before _ready wires the SubViewport
 	if continuous:
 		return  # never downgrade UPDATE_ALWAYS to UPDATE_ONCE mid-motion
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -68,6 +72,8 @@ func request_frame() -> void:
 
 func set_continuous(on: bool) -> void:
 	continuous = on
+	if _viewport == null:
+		return
 	_viewport.render_target_update_mode = \
 		SubViewport.UPDATE_ALWAYS if on else SubViewport.UPDATE_DISABLED
 
@@ -104,6 +110,8 @@ func _aspect() -> float:
 
 
 func _apply_size() -> void:
+	if _viewport == null:
+		return  # setup()/set_render_scale() may run before _ready
 	var px := Vector2i(maxi(1, int(round(size.x * render_scale))),
 		maxi(1, int(round(size.y * render_scale))))
 	_viewport.size = px
