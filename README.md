@@ -90,6 +90,7 @@ are. An exported build cannot write into the project, so it saves to
 |---|---|
 | `saves/default.json` | the opening view |
 | `saves/juliaIceField.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Slice −2.29, Inner 0, Fold 0.72, Outer 0.29, Ice Fractal, precision 0.00002 |
+| `saves/juliaIceTerraces.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Slice −1.88, Inner 0.49, Fold 0.81, Outer 0.53, Ice Fractal, precision 0.0001 |
 
 ## Default view
 
