@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/controls_panel.gd" id="1"]
+
+[node name="ControlsPanel" type="PanelContainer"]
+offset_right = 320.0
+offset_bottom = 460.0
+script = ExtResource("1")
