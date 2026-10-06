@@ -34,6 +34,21 @@ func run() -> void:
 	Input.action_release("move_right")
 	check_approx(combo.length(), 1.0, "diagonal input is normalised")
 
+	# --- Cmd+S saves, so S under Cmd does not also fly backwards ---
+	var meta := InputEventKey.new()
+	meta.keycode = KEY_META
+	meta.physical_keycode = KEY_META
+	meta.pressed = true
+	Input.parse_input_event(meta)
+	await frames(1)
+	Input.action_press("move_back")
+	var under_cmd: Vector3 = fly.move_direction()
+	Input.action_release("move_back")
+	meta.pressed = false
+	Input.parse_input_event(meta)
+	await frames(1)
+	check(under_cmd == Vector3.ZERO, "no movement while Cmd is held (got %s)" % under_cmd)
+
 	# --- speed equals D(eye) * factor within [1e-6, 20] * factor ---
 	var params: FractalParams = ctx[0]
 	var expected := clampf(DistanceEstimator.estimate(cam.eye(), params), 1e-6, 20.0) * cam.speed_factor

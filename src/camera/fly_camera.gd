@@ -66,7 +66,10 @@ func apply_look(dx: float, dy: float) -> void:
 
 
 ## Unit movement direction in world space from the six actions (camera axes).
+## Nothing while Cmd or Ctrl is held: Cmd+S saves, and S alone is move_back.
 func move_direction() -> Vector3:
+	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL):
+		return Vector3.ZERO
 	var f := Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
 	var s := Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 	var u := Input.get_action_strength("move_up") - Input.get_action_strength("move_down")

@@ -59,6 +59,7 @@ captured in this mode.
 
 | row | controls |
 |---|---|
+| **Save** / **Load** | pick a file in a native panel; saves live in `saves/`, tracked by git (shape, colour, precision, Julia, camera). The current file's name sits to the right |
 | **Slice (Scale)** | the Mandelbox scale |
 | **Inner Radius** / **Fold** / **Outer Radius** | the three remaining shape parameters |
 | **Color** | one of the thirteen colour modes (Grayscale, Ice Fractal, Borg, Rainbow, Rainbow 2, Rainbow 3, Rainbow Metal, Blue, Blue 2, Pink-Blue, Ice Box, Ice Box 2, Gold) |
@@ -68,8 +69,27 @@ captured in this mode.
 | **Camera** | Fly or Orbit |
 | **Mouse sensitivity** | look / orbit speed |
 
+**⌘S** (Ctrl+S elsewhere) saves over the current file without a panel; with
+no current file it opens the Save panel. The line under the buttons reports
+each save and load, including any values a file had that this build skipped.
+
 While Julia mode is on, a white ring marks the Julia point in the view; drag it
 (with the mouse free) to move the point in the plane facing the camera.
+
+## Saved views
+
+A save is a small JSON file: a `fractal` section with every panel value
+(colour mode by the site's id, camera mode as `"fly"`/`"orbit"`, the Julia
+point as `[x, y, z]`) and a `camera` section with the eye, forward and up
+vectors and the speed factor. Loading skips anything it does not recognise or
+cannot read, with a warning, and leaves values a file does not mention as they
+are. An exported build cannot write into the project, so it saves to
+`user://saves/` instead.
+
+| file | what it is |
+|---|---|
+| `saves/default.json` | the opening view |
+| `saves/juliaIceField.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Slice −2.29, Inner 0, Fold 0.72, Outer 0.29, Ice Fractal, precision 0.00002 |
 
 ## Default view
 

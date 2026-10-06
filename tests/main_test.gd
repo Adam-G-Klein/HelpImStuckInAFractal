@@ -50,5 +50,30 @@ func run() -> void:
 		check(orbit2.center.is_equal_approx(Vector3(9, 9, 9)),
 			"a slider change in orbit mode does not recenter")
 
+	# save and load: the buttons open the panels; the real save path round-trips
+	var files: WorkspaceFiles = main.workspace_files()
+	check(files != null, "Main owns a WorkspaceFiles")
+	check(main.panel.save_button.pressed.is_connected(files.prompt_save), "Save opens the save panel")
+	check(main.panel.load_button.pressed.is_connected(files.prompt_load), "Load opens the open panel")
+	check_eq(main.panel.file_label.text, "\u2014", "no file is current at startup")
+
+	var tmp := "user://main_test_view.json"
+	main.params.camera_mode = FractalParams.CameraMode.FLY
+	main.params.fold_limit = 0.72
+	main.camera.speed_factor = 2.0
+	main.save_view_to(tmp)
+	check_eq(files.current_path, tmp, "a save that worked becomes current")
+	check_eq(main.panel.file_label.text, "main_test_view.json", "and the panel names it")
+	main.params.fold_limit = 0.3
+	main.camera.speed_factor = 1.0
+	main.load_view_from(tmp)
+	check_approx(main.params.fold_limit, 0.72, "loading restores the shape")
+	check_approx(main.camera.speed_factor, 2.0, "and the camera")
+	check(main.panel.status_label.text.begins_with("Loaded"), "the panel reports the load: %s" % main.panel.status_label.text)
+	main.load_view_from("user://no_such_view.json")
+	check_eq(files.current_path, tmp, "a failed load does not change the current file")
+	check(main.panel.status_label.text.begins_with("Load failed"), "and says it failed")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+
 	main.queue_free()
 	await frames(1)

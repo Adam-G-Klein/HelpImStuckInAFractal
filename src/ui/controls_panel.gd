@@ -19,6 +19,10 @@ var camera_option: OptionButton
 var sens_slider: HSlider
 var speed_label: Label
 var legend_label: Label
+var save_button: Button
+var load_button: Button
+var file_label: Label
+var status_label: Label
 
 var _params: FractalParams
 var _camera: CameraState
@@ -35,6 +39,26 @@ func _build() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	var box := VBoxContainer.new()
 	add_child(box)
+
+	var files_row := HBoxContainer.new()
+	save_button = Button.new()
+	save_button.text = "Save"
+	save_button.tooltip_text = "Save the shape, colour and camera to a file in saves/ (Cmd+S overwrites the current file)"
+	load_button = Button.new()
+	load_button.text = "Load"
+	load_button.tooltip_text = "Load a saved view from saves/"
+	file_label = Label.new()
+	file_label.clip_text = true
+	file_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	files_row.add_child(save_button)
+	files_row.add_child(load_button)
+	files_row.add_child(file_label)
+	box.add_child(files_row)
+	status_label = Label.new()
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	status_label.visible = false
+	box.add_child(status_label)
+	show_file("")
 
 	scale_slider = _labeled_slider(box, "Slice (Scale)", -5.0, -0.5, 0.01)
 	inner_slider = _labeled_slider(box, "Inner Radius", 0.0, 1.0, 0.01)
@@ -99,6 +123,17 @@ func setup(params: FractalParams, camera: CameraState) -> void:
 	params.changed.connect(_refresh)
 	camera.changed.connect(_refresh)
 	_refresh()
+
+
+## The current save's name, or an em dash when there is none.
+func show_file(display_name: String) -> void:
+	file_label.text = display_name if display_name != "" else "\u2014"
+
+
+## One line about the last save or load; "" hides it.
+func show_status(text: String) -> void:
+	status_label.text = text
+	status_label.visible = text != ""
 
 
 ## True while any text field in the panel holds keyboard focus (so Main can
