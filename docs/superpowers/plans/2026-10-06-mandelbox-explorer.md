@@ -22,6 +22,13 @@ render check runs through `tests/screenshots.sh`.
 **Source of truth:** `docs/superpowers/specs/2026-10-06-mandelbox-explorer-design.md`.
 Read it before starting. This plan implements that spec and nothing beyond it.
 
+**Reference project (Adam's preference):** `/Users/adam/Godot/Fractacular` is a
+sibling Godot 4.6 project that established the conventions this one follows — the
+`run.sh` class-cache refresh, `tests/test_case.gd`, `tests/run_all.sh`,
+`tests/screenshots.sh`/`screenshots.gd`, the `project.godot` layout and the plan
+style. Read those files (read-only — never modify Fractacular) whenever its code
+is a useful model for what you are about to write.
+
 ---
 
 ## Global Constraints
@@ -530,16 +537,21 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 The N=32 Mandelbox estimator (Tom Lowe's formula) with a scalar derivative. Must
 agree with the shader; pinned to the site's own numbers.
 
-> **Validated during planning.** The code below was run headless against all 24
-> fixtures on this machine's `godot4` (4.6.1). 22 of 24 agree with the spec
-> within relative 1e-5. Two **near-surface, non-Julia** points are chaotically
-> float-sensitive and need a looser tolerance (they are a hair off at the last
-> few ulps after 32 iterations, then amplified by dividing by a large `dz`):
-> defaults `(1.2,−0.3,0.8)` measured `4.5415883e-5` vs spec `4.536385e-5`
-> (rel ≈ 1.1e-3), and defaults `(0.1,0.9,1.5)` measured `1.2708344e-5` vs spec
-> `1.2707534e-5` (rel ≈ 6.4e-5). The test below applies the spec's 1e-5 to every
-> row except those two. Do **not** change the maths to chase those two numbers —
-> the maths is correct; the spec's blanket tolerance is simply too tight there.
+> **Validated during planning — all 24 fixtures match at the spec's tolerance**
+> (relative 1e-5, absolute 1e-9 below 1e-6) on this machine's `godot4` (4.6.1),
+> **when the maths runs in scalar 64-bit floats and the input coordinates stay
+> 64-bit.** The catch: Godot's `Vector3` stores 32-bit components in a standard
+> build, so passing the point as a `Vector3` rounds the input before the
+> estimator even starts; near the fractal surface that rounding is amplified and
+> two rows then miss (defaults `(1.2,−0.3,0.8)` and `(0.1,0.9,1.5)`). The fix is
+> twofold: (1) carry the orbit in scalar `float` locals, not `Vector3`
+> arithmetic; (2) pin the fixtures through a scalar-input core `estimate_at(px,
+> py, pz, params)` that keeps the coordinates in 64-bit. Measured proof: via
+> `Vector3` input `(1.2,−0.3,0.8)` → `4.53929e-5`; via 64-bit inputs →
+> `4.5363846e-5` = the spec's `4.536385e-5` (rel ≈ 9e-8). `estimate(p: Vector3,
+> …)` is kept as the public API (camera positions are 32-bit anyway, so the
+> well-conditioned production calls are unaffected) and delegates to
+> `estimate_at`.
 
 **Files:**
 - Create: `src/fractal/distance_estimator.gd`
@@ -549,60 +561,63 @@ agree with the shader; pinned to the site's own numbers.
 - Consumes: `FractalParams` (reads `scale`, `inner_radius`, `outer_radius`,
   `fold_limit`, `julia_enabled`, `julia_point`).
 - Produces: `class_name DistanceEstimator` with
-  `static func estimate(p: Vector3, params: FractalParams) -> float`.
+  `static func estimate(p: Vector3, params: FractalParams) -> float` (public API,
+  delegates) and
+  `static func estimate_at(px: float, py: float, pz: float, params: FractalParams) -> float`
+  (the 64-bit scalar core the fixtures pin).
 
 - [ ] **Step 1: Write the failing test** — `tests/distance_estimator_test.gd`
 
 ```gdscript
 extends "res://tests/test_case.gd"
-## Pins the CPU estimator to the site's own numbers (24 fixtures), plus
-## symmetry and Julia-sensitivity. See the plan's validation note for the two
-## near-surface rows that carry a looser tolerance.
+## Pins the CPU estimator to the site's own numbers (24 fixtures), plus symmetry
+## and Julia-sensitivity. The fixtures pin the 64-bit scalar core `estimate_at`
+## (passing coordinates as `float`, not a 32-bit `Vector3`), so every row holds
+## the spec's tolerance: relative 1e-5, or absolute 1e-9 below 1e-6.
 
 
-func _de(p: Vector3, params: FractalParams, expected: float, label: String,
-		rel := 1e-5, abs_floor := 1e-9) -> void:
-	var got := DistanceEstimator.estimate(p, params)
-	var tol := maxf(abs_floor, rel * absf(expected))
+func _de(px: float, py: float, pz: float, params: FractalParams, expected: float, label: String) -> void:
+	var got := DistanceEstimator.estimate_at(px, py, pz, params)
+	var tol := maxf(1e-9, 1e-5 * absf(expected))
 	check(absf(got - expected) <= tol,
-		"%s: expected %.10g got %.10g (tol %.3g)" % [label, expected, got, tol])
+		"%s: expected %s got %s (tol %s)" % [label, expected, got, tol])
 
 
 func run() -> void:
 	# --- defaults: scale -2.09, inner 0.7, fold 1, outer 1, no Julia ---
 	var d := FractalParams.new()
-	_de(Vector3(0, 0, 0), d, 0.0, "def (0,0,0)")
-	_de(Vector3(0.5, 0.5, 0.5), d, 1.67e-15, "def (0.5,0.5,0.5)")
-	_de(Vector3(1.2, -0.3, 0.8), d, 4.536385e-5, "def (1.2,-0.3,0.8)", 2e-3)  # boundary-sensitive
-	_de(Vector3(2, 2, 2), d, 1.84e-20, "def (2,2,2)")
-	_de(Vector3(3, 0, 0), d, 1.0000000, "def (3,0,0)")
-	_de(Vector3(8.18, 3.81, 3.28), d, 6.5655845, "def (8.18,3.81,3.28)")
-	_de(Vector3(0.1, 0.9, 1.5), d, 1.2707534e-5, "def (0.1,0.9,1.5)", 1e-4)  # boundary-sensitive
-	_de(Vector3(-1.5, 1.5, -1.5), d, 7.2696999e-3, "def (-1.5,1.5,-1.5)")
+	_de(0, 0, 0, d, 0.0, "def (0,0,0)")
+	_de(0.5, 0.5, 0.5, d, 1.67e-15, "def (0.5,0.5,0.5)")
+	_de(1.2, -0.3, 0.8, d, 4.536385e-5, "def (1.2,-0.3,0.8)")
+	_de(2, 2, 2, d, 1.84e-20, "def (2,2,2)")
+	_de(3, 0, 0, d, 1.0000000, "def (3,0,0)")
+	_de(8.18, 3.81, 3.28, d, 6.5655845, "def (8.18,3.81,3.28)")
+	_de(0.1, 0.9, 1.5, d, 1.2707534e-5, "def (0.1,0.9,1.5)")
+	_de(-1.5, 1.5, -1.5, d, 7.2696999e-3, "def (-1.5,1.5,-1.5)")
 
 	# --- alternative shape: scale -3, inner 0.5, fold 0.8, outer 0.9 ---
 	var a := FractalParams.new()
 	a.scale = -3.0; a.inner_radius = 0.5; a.fold_limit = 0.8; a.outer_radius = 0.9
-	_de(Vector3(0, 0, 0), a, 0.0, "alt (0,0,0)")
-	_de(Vector3(0.5, 0.5, 0.5), a, 3.9589733e-3, "alt (0.5,0.5,0.5)")
-	_de(Vector3(1.2, -0.3, 0.8), a, 7.3684211e-2, "alt (1.2,-0.3,0.8)")
-	_de(Vector3(2, 2, 2), a, 0.69282032, "alt (2,2,2)")
-	_de(Vector3(3, 0, 0), a, 1.4000000, "alt (3,0,0)")
-	_de(Vector3(8.18, 3.81, 3.28), a, 7.1416315, "alt (8.18,3.81,3.28)")
-	_de(Vector3(0.1, 0.9, 1.5), a, 1.2998357e-2, "alt (0.1,0.9,1.5)")
-	_de(Vector3(-1.5, 1.5, -1.5), a, 3.5649260e-3, "alt (-1.5,1.5,-1.5)")
+	_de(0, 0, 0, a, 0.0, "alt (0,0,0)")
+	_de(0.5, 0.5, 0.5, a, 3.9589733e-3, "alt (0.5,0.5,0.5)")
+	_de(1.2, -0.3, 0.8, a, 7.3684211e-2, "alt (1.2,-0.3,0.8)")
+	_de(2, 2, 2, a, 0.69282032, "alt (2,2,2)")
+	_de(3, 0, 0, a, 1.4000000, "alt (3,0,0)")
+	_de(8.18, 3.81, 3.28, a, 7.1416315, "alt (8.18,3.81,3.28)")
+	_de(0.1, 0.9, 1.5, a, 1.2998357e-2, "alt (0.1,0.9,1.5)")
+	_de(-1.5, 1.5, -1.5, a, 3.5649260e-3, "alt (-1.5,1.5,-1.5)")
 
 	# --- defaults with Julia on at (-0.23, 1.512, 1.892) ---
 	var j := FractalParams.new()
 	j.julia_enabled = true
-	_de(Vector3(0, 0, 0), j, 4.9979908e-3, "jul (0,0,0)")
-	_de(Vector3(0.5, 0.5, 0.5), j, 1.0887837e-2, "jul (0.5,0.5,0.5)")
-	_de(Vector3(1.2, -0.3, 0.8), j, 4.5308936e-3, "jul (1.2,-0.3,0.8)")
-	_de(Vector3(2, 2, 2), j, 4.9979908e-3, "jul (2,2,2)")
-	_de(Vector3(3, 0, 0), j, 8.0696204e-3, "jul (3,0,0)")
-	_de(Vector3(8.18, 3.81, 3.28), j, 2.3521820, "jul (8.18,3.81,3.28)")
-	_de(Vector3(0.1, 0.9, 1.5), j, 3.6647735e-3, "jul (0.1,0.9,1.5)")
-	_de(Vector3(-1.5, 1.5, -1.5), j, 0.25217396, "jul (-1.5,1.5,-1.5)")
+	_de(0, 0, 0, j, 4.9979908e-3, "jul (0,0,0)")
+	_de(0.5, 0.5, 0.5, j, 1.0887837e-2, "jul (0.5,0.5,0.5)")
+	_de(1.2, -0.3, 0.8, j, 4.5308936e-3, "jul (1.2,-0.3,0.8)")
+	_de(2, 2, 2, j, 4.9979908e-3, "jul (2,2,2)")
+	_de(3, 0, 0, j, 8.0696204e-3, "jul (3,0,0)")
+	_de(8.18, 3.81, 3.28, j, 2.3521820, "jul (8.18,3.81,3.28)")
+	_de(0.1, 0.9, 1.5, j, 3.6647735e-3, "jul (0.1,0.9,1.5)")
+	_de(-1.5, 1.5, -1.5, j, 0.25217396, "jul (-1.5,1.5,-1.5)")
 
 	# --- symmetry: D(p) == D(-p) in non-Julia mode ---
 	for p in [Vector3(0.7, 0.3, 0.9), Vector3(1.2, -0.3, 0.8), Vector3(3, 0, 0),
@@ -614,6 +629,10 @@ func run() -> void:
 	check(absf(DistanceEstimator.estimate(Vector3(3, 0, 0), d)
 			- DistanceEstimator.estimate(Vector3(3, 0, 0), j)) > 0.5,
 		"turning Julia on changes the distance")
+
+	# --- the public Vector3 API delegates to the core ---
+	check_approx(DistanceEstimator.estimate(Vector3(3, 0, 0), d),
+		DistanceEstimator.estimate_at(3.0, 0.0, 0.0, d), "estimate() == estimate_at()", 1e-6)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -629,37 +648,56 @@ extends RefCounted
 ## CPU copy of the shader's Mandelbox distance estimator (Tom Lowe's formula),
 ## N = 32 (the high-precision variant). Carries the scalar derivative in `dz`.
 ## Must give the same numbers as mandelbox.gdshader's `de(p, 32)`.
+##
+## The orbit runs in scalar `float` locals (GDScript floats are 64-bit) rather
+## than Vector3 arithmetic: Vector3 components are 32-bit in a standard Godot
+## build, and that lost input precision is amplified near the surface, throwing
+## off the near-boundary fixtures. `estimate_at` keeps the coordinates 64-bit;
+## `estimate(p: Vector3, …)` is the public API for callers that already hold a
+## (32-bit) Vector3 camera position, where the precision loss is harmless.
 
 const ITERATIONS := 32
 
 
 static func estimate(p: Vector3, params: FractalParams) -> float:
+	return estimate_at(p.x, p.y, p.z, params)
+
+
+static func estimate_at(px: float, py: float, pz: float, params: FractalParams) -> float:
 	var scale := params.scale
 	var min_r2 := params.inner_radius * params.inner_radius
 	var fixed_r2 := params.outer_radius * params.outer_radius
 	var fold := params.fold_limit
-	var c := params.julia_point if params.julia_enabled else p
-	var z := p
+	var julia := params.julia_enabled
+	var cx := params.julia_point.x if julia else px
+	var cy := params.julia_point.y if julia else py
+	var cz := params.julia_point.z if julia else pz
+	var zx := px
+	var zy := py
+	var zz := pz
 	var dz := 1.0
 	for i in ITERATIONS:
 		# Box fold each component.
-		z = Vector3(
-			clampf(z.x, -fold, fold) * 2.0 - z.x,
-			clampf(z.y, -fold, fold) * 2.0 - z.y,
-			clampf(z.z, -fold, fold) * 2.0 - z.z)
+		zx = clampf(zx, -fold, fold) * 2.0 - zx
+		zy = clampf(zy, -fold, fold) * 2.0 - zy
+		zz = clampf(zz, -fold, fold) * 2.0 - zz
 		# Sphere fold.
-		var r2 := z.dot(z)
+		var r2 := zx * zx + zy * zy + zz * zz
 		var k := 1.0
 		if r2 < min_r2:
 			k = fixed_r2 / min_r2
 		elif r2 < fixed_r2:
 			k = fixed_r2 / r2
-		z *= k
+		zx *= k
+		zy *= k
+		zz *= k
 		dz *= k
 		# Scale and add.
-		z = scale * z + c
+		zx = scale * zx + cx
+		zy = scale * zy + cy
+		zz = scale * zz + cz
 		dz = -dz * scale + 1.0
-	return z.length() / absf(dz)
+	return sqrt(zx * zx + zy * zy + zz * zz) / absf(dz)
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -929,7 +967,11 @@ vec3 hue(float q) {
 // Ray vs axis-aligned cube of half-size `half_size`, centred at the origin.
 // Returns vec2(t_enter, t_exit); a miss has t_exit < max(t_enter, 0).
 vec2 box_intersect(vec3 ro, vec3 rd, float half_size) {
-	vec3 inv = 1.0 / rd;
+	// Guard against exactly axis-aligned rays: floor each |component| at 1e-9
+	// (keeping its sign), so 1.0/rd never produces an infinity or NaN.
+	vec3 sgn = vec3(rd.x >= 0.0 ? 1.0 : -1.0, rd.y >= 0.0 ? 1.0 : -1.0, rd.z >= 0.0 ? 1.0 : -1.0);
+	vec3 safe_rd = sgn * max(abs(rd), vec3(1e-9));
+	vec3 inv = 1.0 / safe_rd;
 	vec3 n = inv * ro;
 	vec3 k = abs(inv) * half_size;
 	vec3 t1 = -n - k;
@@ -983,7 +1025,10 @@ void fragment() {
 		} else {
 			float ce = float(n1 + n2) / 128.0;
 			float inv = 1.0 - ce;
-			vec3 v = eye + dir * total;
+			if (color_mode == 0) {
+				COLOR = vec4(vec3(inv), 1.0);  // Grayscale needs no normal: stay cheap
+			} else {
+				vec3 v = eye + dir * total;
 			vec3 h = v * 0.5;
 			vec3 eh = eye * 0.5;
 			float delta = precision * total * 40.0;
@@ -1001,10 +1046,8 @@ void fragment() {
 			lgt = 0.5 * lgt + pow(lgt, 160.0) + 0.1;
 			vec3 base = vec3(lgt) * (-n * 0.25 + 0.75) + vec3(0.0, 0.0, 0.2);
 
-			vec3 col;
-			if (color_mode == 0) {
-				col = vec3(inv);
-			} else if (color_mode == 1) {
+				vec3 col;
+				if (color_mode == 1) {
 				col = base * vec3(inv + 0.5, 2.0 * inv * inv + 0.5, 5.0 * pow(inv, 4.0) + 0.5);
 			} else if (color_mode == 2) {
 				col = base * vec3(max(lgt * ce, inv), max(ce, inv), max(0.5 * lgt * ce, inv));
@@ -1042,7 +1085,8 @@ void fragment() {
 			} else {
 				col = vec3(inv);
 			}
-			COLOR = vec4(col, 1.0);
+				COLOR = vec4(col, 1.0);
+			}
 		}
 	}
 }
@@ -1097,7 +1141,9 @@ func run() -> void:
 	var cam := CameraState.make_default()
 	var view: FractalView = load("res://src/fractal/fractal_view.tscn").instantiate()
 	root.add_child(view)
-	view.size = Vector2(1280, 800)   # projection uses the Control's own size
+	await frames(1)                                    # let _ready wire the SubViewport
+	view.set_anchors_preset(Control.PRESET_TOP_LEFT)   # stop filling the window so size sticks
+	view.size = Vector2(1280, 800)                     # projection uses the Control's own size
 	view.setup(params, cam)
 	await frames(1)
 
@@ -1204,6 +1250,8 @@ func set_render_scale(s: float) -> void:
 
 
 func request_frame() -> void:
+	if continuous:
+		return  # never downgrade UPDATE_ALWAYS to UPDATE_ONCE mid-motion
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
@@ -1364,7 +1412,8 @@ speed factor.
 - Consumes: `FractalParams`, `CameraState`, `DistanceEstimator`, the six move
   actions.
 - Produces: `class_name FlyCamera extends Node` with
-  `setup(params, camera)`, `enabled: bool`, `apply_look(dx: float, dy: float)`,
+  `setup(params, camera)`, `enabled: bool`, `handle_event(event: InputEvent) -> bool`
+  (Main dispatches mouse events here), `apply_look(dx: float, dy: float)`,
   `move_direction() -> Vector3`, `current_speed() -> float`, `scroll(up: bool)`.
 
 - [ ] **Step 1: Write the failing test** — `tests/fly_camera_test.gd`
@@ -1422,13 +1471,22 @@ func run() -> void:
 	for i in 120: fly.scroll(true)
 	check(cam.speed_factor <= 100.0, "factor ceils at 100")
 
-	# --- yaw keeps the camera level; pitch is clamped away from +/-Z ---
+	# --- yaw keeps the camera level ---
+	cam.transform = CameraState.make_default().transform
 	fly.apply_look(100.0, 0.0)   # pure yaw
 	check_approx(cam.right().z, 0.0, "after yaw the right axis is still level", 1e-5)
+
+	# --- pitching down actually tilts the view by a real amount ---
+	cam.transform = CameraState.make_default().transform   # forward.z ~ -0.342
+	fly.apply_look(0.0, 300.0)   # 30 deg down at sensitivity 0.1
+	check(cam.forward().z < -0.75,
+		"pitching down drops forward.z well below the start (got %s)" % cam.forward().z)
+
+	# --- pitch saturates at 89 deg; it never reaches +/-Z and never wraps ---
 	fly.apply_look(0.0, 1e6)     # extreme pitch down
-	check(absf(cam.forward().z) < 0.9999, "pitch never reaches straight down (+/-Z)")
+	check_approx(absf(cam.forward().z), sin(deg_to_rad(89.0)), "pitch saturates 89 deg down", 1e-3)
 	fly.apply_look(0.0, -1e6)    # extreme pitch up
-	check(absf(cam.forward().z) < 0.9999, "pitch never reaches straight up (+/-Z)")
+	check_approx(absf(cam.forward().z), sin(deg_to_rad(89.0)), "pitch saturates 89 deg up", 1e-3)
 
 	fly.queue_free()
 	await frames(1)
@@ -1449,7 +1507,7 @@ extends Node
 ## distance to the nearest surface. Reads and writes a shared CameraState.
 
 const WORLD_UP := Vector3(0, 0, 1)
-const MIN_PITCH_MARGIN_DEG := 1.0   # keep forward 1 deg away from +/-Z
+const MAX_FORWARD_Z := 0.9998476951563913   # sin(89 deg): keep forward 1 deg off +/-Z
 
 var enabled := false
 
@@ -1462,16 +1520,23 @@ func setup(params: FractalParams, camera: CameraState) -> void:
 	_camera = camera
 
 
-func _unhandled_input(event: InputEvent) -> void:
+## Mouse dispatch is owned by Main, which calls this for the active camera.
+## Returns true when the event was consumed. Look only while captured; wheel
+## adjusts the speed factor.
+func handle_event(event: InputEvent) -> bool:
 	if not enabled:
-		return
+		return false
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		apply_look(event.relative.x, event.relative.y)
-	elif event is InputEventMouseButton and event.pressed:
+		return true
+	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			scroll(true)
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			return true
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			scroll(false)
+			return true
+	return false
 
 
 func _physics_process(delta: float) -> void:
@@ -1485,27 +1550,21 @@ func _physics_process(delta: float) -> void:
 	_camera.transform = t
 
 
-## Rotate the view by a mouse delta (pixels). Yaw about world +Z, pitch about
-## the camera's right axis, pitch clamped, roll removed by rebuilding the basis.
+## Rotate the view by a mouse delta (pixels). Yaw turns the heading about world
+## +Z (pitch preserved); pitch sets the elevation angle, clamped to +/-89 deg so
+## the forward vector never reaches +/-Z. Clamping the ANGLE (not forward.z after
+## an arbitrary rotation) means even a huge delta saturates instead of wrapping.
 func apply_look(dx: float, dy: float) -> void:
 	var sens := _params.mouse_sensitivity
-	var yaw := deg_to_rad(-dx * sens)
-	var pitch := deg_to_rad(-dy * sens)
-	var fwd := _camera.forward()
-
-	# yaw about world +Z
-	fwd = fwd.rotated(WORLD_UP, yaw)
-
-	# pitch about the current right axis (recomputed from yawed forward)
-	var right := fwd.cross(WORLD_UP).normalized()
-	fwd = fwd.rotated(right, pitch)
-
-	# clamp so forward stays away from +/-Z
-	var max_cos := cos(deg_to_rad(90.0 - MIN_PITCH_MARGIN_DEG))
-	fwd.z = clampf(fwd.z, -max_cos, max_cos)
-	fwd = fwd.normalized()
-
-	_set_forward(fwd)
+	var fwd := _camera.forward().rotated(WORLD_UP, deg_to_rad(-dx * sens))  # yaw keeps pitch
+	var max_pitch := asin(MAX_FORWARD_Z)
+	var pitch_new := clampf(asin(clampf(fwd.z, -1.0, 1.0)) + deg_to_rad(-dy * sens), -max_pitch, max_pitch)
+	var horiz := Vector3(fwd.x, fwd.y, 0.0)
+	if horiz.length() > 1e-9:
+		horiz = horiz.normalized()
+	else:
+		horiz = Vector3(_camera.right().y, -_camera.right().x, 0.0).normalized()
+	_set_forward(horiz * cos(pitch_new) + WORLD_UP * sin(pitch_new))
 
 
 ## Unit movement direction in world space from the six actions (camera axes).
@@ -1568,7 +1627,9 @@ freeze. Pure logic in `step(frame_time, changing)`; the Node wires it to
 - Produces: `class_name ResolutionGovernor extends Node`, enum
   `Mode { CONTINUOUS, FINAL_FRAME, IDLE }`, observable `scale: float`,
   `mode: Mode`, `fast_controls: bool`, pure `step(frame_time: float, changing: bool)`,
-  and `setup(params, view)` + `mark_changed()` + `set_dragging(on)` for wiring.
+  and `setup(params, view)` + `mark_changed()` for wiring. (`changing` comes from
+  the two `changed` signals via the dirty flag; a drag that changes a resource
+  already trips it, and a drag that changes nothing needs no frame.)
 
 - [ ] **Step 1: Write the failing test** — `tests/resolution_governor_test.gd`
 
@@ -1590,11 +1651,13 @@ func run() -> void:
 	var after_one := g.scale
 	g.step(slow, true)                       # within 0.5 s: no second change
 	check_approx(g.scale, after_one, "not lowered twice within 0.5 s", 1e-6)
-	for i in 20: g.step(slow, true)          # enough elapsed time to keep lowering
+	# with the cooldown removed, sustained slow frames walk down to the floor
+	g.cooldown = 0.0
+	for i in 15: g.step(slow, true)
 	check_approx(g.scale, 0.25, "sustained slow frames reach the 0.25 floor", 1e-6)
 
 	# --- fast frames raise it again, never above 1.0 ---
-	for i in 60: g.step(fast, true)
+	for i in 40: g.step(fast, true)
 	check_approx(g.scale, 1.0, "sustained fast frames reach the 1.0 ceiling", 1e-6)
 
 	# --- stopping: one FINAL_FRAME at scale 1, then IDLE ---
@@ -1635,20 +1698,19 @@ enum Mode { CONTINUOUS, FINAL_FRAME, IDLE }
 
 const TARGET := 1.0 / 30.0
 const EMA_ALPHA := 0.2
-const COOLDOWN := 0.5           # seconds between scale changes
 const STEP := 0.8               # scale multiplier per adjustment
 
 var scale := 1.0
 var mode := Mode.IDLE
 var fast_controls := true
+var cooldown := 0.5             # seconds between scale changes; tests may lower it
 
 var _params: FractalParams
 var _view: FractalView
 var _ema := TARGET
-var _since_change := COOLDOWN   # allow an adjustment on the first frame
+var _since_change := 0.5        # allow an adjustment on the first frame
 var _idle_pending := false
 var _dirty := false
-var _dragging := false
 
 
 func setup(params: FractalParams, view: FractalView) -> void:
@@ -1662,14 +1724,10 @@ func mark_changed() -> void:
 	_dirty = true
 
 
-func set_dragging(on: bool) -> void:
-	_dragging = on
-
-
 func _process(delta: float) -> void:
 	if _view == null:
 		return
-	var changing := _dirty or _dragging
+	var changing := _dirty
 	_dirty = false
 	step(delta, changing)
 	_view.set_render_scale(scale)
@@ -1692,7 +1750,7 @@ func step(frame_time: float, changing: bool) -> void:
 		_idle_pending = true
 		if fast_controls:
 			_ema = _ema * (1.0 - EMA_ALPHA) + frame_time * EMA_ALPHA
-			if _since_change >= COOLDOWN:
+			if _since_change >= cooldown:
 				if _ema > 1.2 * TARGET and scale > 0.25:
 					scale = clampf(scale * STEP, 0.25, 1.0)
 					_since_change = 0.0
@@ -1798,7 +1856,7 @@ func run() -> void:
 	check_approx(panel.scale_slider.value, -1.0, "external scale change updates the slider")
 	params.julia_point = Vector3(1, 2, 3)
 	await frames(1)
-	check_eq(panel.julia_x.text, "1", "external julia move updates the X field")
+	check_approx(panel.julia_x.text.to_float(), 1.0, "external julia move updates the X field")
 
 	panel.queue_free()
 	await frames(1)
@@ -1812,9 +1870,13 @@ Expected: FAIL — scene/`ControlsPanel` do not exist.
 - [ ] **Step 3: Write the implementation** — `src/ui/controls_panel.gd`
 
 Build the widgets in code so the scene stays a bare `PanelContainer` and the
-test can address each widget by name. Wire writes to the resources and connect
-`params.changed` to refresh the widgets (guarded by a `_syncing` flag so a
-refresh does not re-emit a write).
+test can address each widget by name. The widgets are built in `_build()` called
+from `setup()` (not `_ready`): in a headless `SceneTree` test, `add_child` does
+not run `_ready` until the next frame, so building in `setup` guarantees the
+widgets exist before the first `_refresh` (otherwise `_refresh` would hit null
+widgets and leave `_syncing` stuck true, silently blocking every write). Wire
+writes to the resources and connect `params.changed` to refresh the widgets
+(guarded by a `_syncing` flag so a refresh does not re-emit a write).
 
 ```gdscript
 class_name ControlsPanel
@@ -1842,9 +1904,15 @@ var legend_label: Label
 var _params: FractalParams
 var _camera: CameraState
 var _syncing := false
+var _built := false
 
 
-func _ready() -> void:
+## Build the widgets. Called from setup() (not _ready) so the panel is fully
+## constructed before the first refresh, regardless of _ready timing.
+func _build() -> void:
+	if _built:
+		return
+	_built = true
 	set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	var box := VBoxContainer.new()
 	add_child(box)
@@ -1908,6 +1976,7 @@ func _ready() -> void:
 func setup(params: FractalParams, camera: CameraState) -> void:
 	_params = params
 	_camera = camera
+	_build()
 	params.changed.connect(_refresh)
 	camera.changed.connect(_refresh)
 	_refresh()
@@ -2041,19 +2110,19 @@ and handle Q. This makes `./run.sh` work for the first time.
 **Interfaces:**
 - Consumes: every unit above.
 - Produces: `class_name Main extends Node`, scene `src/main.tscn` (the project's
-  `run/main_scene`), with children `FractalView`, `JuliaMarker` (added in Task
-  12 — add the node now, pointing at a script created there, OR add it in Task
-  12 and re-save the scene; this task adds the other five children and leaves a
-  `JuliaMarker` node slot), `ControlsPanel`, `ResolutionGovernor`, `FlyCamera`,
-  `OrbitCamera`.
+  `run/main_scene`), with children `FractalView`, `JuliaMarker`, `ControlsPanel`,
+  `ResolutionGovernor`, `FlyCamera`, `OrbitCamera`. Main's `_unhandled_input` is
+  the **single mouse dispatcher**: Q → JuliaMarker → active camera's
+  `handle_event`.
 
-> **Build order note:** `OrbitCamera` (Task 11) and `JuliaMarker` (Task 12) come
-> after this task. To keep `main.gd` compiling now, reference them by node
-> presence and duck-typed methods: in this task add `FlyCamera` and a
-> placeholder `OrbitCamera`/`JuliaMarker` are **not** required for the tests.
-> Add `OrbitCamera` and `JuliaMarker` children when their tasks land and extend
-> `main.gd`'s camera switch then. `main_test` here only asserts FLY/ORBIT node
-> enabling via `FlyCamera` + a stub, and Q toggling. See Step 3's guard.
+> **Build order note:** `OrbitCamera` (Task 11) and `JuliaMarker` (Task 12) land
+> after this task. `main.gd` below references them with `get_node_or_null` and
+> stores them in `_orbit` / `_marker`, so it compiles and runs now with those
+> nodes absent (the ORBIT/JuliaMarker branches simply no-op). This task adds
+> `FractalView`, `FlyCamera`, `ResolutionGovernor`, `ControlsPanel` to
+> `main.tscn`; Tasks 11 and 12 add the `OrbitCamera` and `JuliaMarker` children
+> and re-save the scene. `main_test` here asserts FLY/ORBIT enabling, Q toggling,
+> the click-to-recapture fix, and that a non-mode param change does not recenter.
 
 - [ ] **Step 1: Write the failing test** — `tests/main_test.gd`
 
@@ -2080,13 +2149,35 @@ func run() -> void:
 	check(not panel.visible, "Q hides it again")
 
 	# switching to ORBIT disables the fly camera and enables orbit
-	main.get_node("FractalParams") if false else null   # (params live on main)
 	main.params.camera_mode = FractalParams.CameraMode.ORBIT
 	await frames(1)
 	check(not fly.enabled, "fly camera is disabled in ORBIT mode")
 	var orbit = main.get_node_or_null("OrbitCamera")
 	if orbit != null:
 		check(orbit.enabled, "orbit camera is enabled in ORBIT mode")
+
+	# (bug 5a) a left click in FLY mode with the panel open hides it and recaptures
+	main.params.camera_mode = FractalParams.CameraMode.FLY
+	await frames(1)
+	main.panel.visible = true
+	main._update_mouse()
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = Vector2(400, 300)
+	main._unhandled_input(click)
+	check(not main.panel.visible, "a click in fly mode hides the open panel")
+
+	# (bug 5b) changing a non-mode param in orbit mode must not re-run enter()
+	main.params.camera_mode = FractalParams.CameraMode.ORBIT
+	await frames(1)
+	var orbit2 = main.get_node_or_null("OrbitCamera")
+	if orbit2 != null:
+		orbit2.center = Vector3(9, 9, 9)   # sentinel
+		main.params.scale = -3.0           # a non-mode change
+		await frames(1)
+		check(orbit2.center.is_equal_approx(Vector3(9, 9, 9)),
+			"a slider change in orbit mode does not recenter")
 
 	main.queue_free()
 	await frames(1)
@@ -2103,7 +2194,7 @@ Expected: FAIL — scene/`Main` do not exist.
 class_name Main
 extends Node
 ## Wires the two resources into every child, selects the active camera from
-## camera_mode, owns the mouse capture, and handles the Q toggle.
+## camera_mode, owns the mouse capture, and is the single mouse-event dispatcher.
 
 var params: FractalParams
 var camera: CameraState
@@ -2112,6 +2203,10 @@ var camera: CameraState
 @onready var panel: ControlsPanel = $ControlsPanel
 @onready var governor: ResolutionGovernor = $ResolutionGovernor
 @onready var fly: FlyCamera = $FlyCamera
+
+var _orbit: OrbitCamera
+var _marker: JuliaMarker
+var _last_mode := -1
 
 
 func _ready() -> void:
@@ -2123,12 +2218,12 @@ func _ready() -> void:
 	governor.setup(params, view)
 	fly.setup(params, camera)
 
-	var orbit := get_node_or_null("OrbitCamera")
-	if orbit:
-		orbit.setup(params, camera)
-	var marker := get_node_or_null("JuliaMarker")
-	if marker:
-		marker.setup(params, view)
+	_orbit = get_node_or_null("OrbitCamera")
+	if _orbit:
+		_orbit.setup(params, camera, view)
+	_marker = get_node_or_null("JuliaMarker")
+	if _marker:
+		_marker.setup(params, camera, view)
 
 	panel.visible = false
 	params.changed.connect(_apply_mode)
@@ -2139,11 +2234,12 @@ func _ready() -> void:
 func _apply_mode() -> void:
 	var is_fly := params.camera_mode == FractalParams.CameraMode.FLY
 	fly.enabled = is_fly
-	var orbit := get_node_or_null("OrbitCamera")
-	if orbit:
-		orbit.enabled = not is_fly
-		if not is_fly and orbit.has_method("enter"):
-			orbit.enter()
+	if _orbit:
+		_orbit.enabled = not is_fly
+		# enter() only when the mode actually changed, not on every slider move
+		if not is_fly and params.camera_mode != _last_mode:
+			_orbit.enter()
+	_last_mode = params.camera_mode
 	_update_mouse()
 
 
@@ -2152,19 +2248,50 @@ func _update_mouse() -> void:
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if capture else Input.MOUSE_MODE_VISIBLE)
 
 
+func _active_camera() -> Node:
+	return fly if params.camera_mode == FractalParams.CameraMode.FLY else _orbit
+
+
+# The only mouse dispatcher: Q -> JuliaMarker -> active camera.
 func _unhandled_input(event: InputEvent) -> void:
+	# 1. Q toggles the panel (ignored while a panel text field has focus)
 	if event.is_action_pressed("toggle_panel"):
 		if panel.text_field_has_focus():
 			return
 		panel.visible = not panel.visible
 		_update_mouse()
 		get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton and event.pressed \
-			and event.button_index == MOUSE_BUTTON_LEFT:
-		# click on the view in FLY mode while free: hide panel, recapture
-		if params.camera_mode == FractalParams.CameraMode.FLY \
-				and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE and not panel.visible:
-			_update_mouse()
+		return
+
+	# 2. Julia marker drag, only while the mouse is free
+	if _marker and params.julia_enabled and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				if _marker.begin_drag(event.position):
+					get_viewport().set_input_as_handled()
+					return
+			else:
+				_marker.end_drag()
+		elif event is InputEventMouseMotion and _marker.is_dragging():
+			_marker.update_drag(event.position)
+			get_viewport().set_input_as_handled()
+			return
+
+	# 3. click outside the panel in FLY mode while free: hide panel, recapture.
+	# (The panel consumes clicks inside itself, so a click reaching here is outside.)
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT \
+			and params.camera_mode == FractalParams.CameraMode.FLY \
+			and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
+		panel.visible = false
+		_update_mouse()
+		get_viewport().set_input_as_handled()
+		return
+
+	# 4. the active camera handles the rest (look when captured, wheel, orbit drags)
+	var cam_node := _active_camera()
+	if cam_node and cam_node.handle_event(event):
+		get_viewport().set_input_as_handled()
 ```
 
 - [ ] **Step 4: Create `src/main.tscn`**
@@ -2174,12 +2301,13 @@ Instance the two sub-scenes and add the camera/governor nodes. (Add
 reach this task first, add them in Tasks 11-12 and re-save the scene.)
 
 ```
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://src/fractal/fractal_view.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://src/ui/controls_panel.tscn" id="3"]
 [ext_resource type="Script" path="res://src/camera/fly_camera.gd" id="4"]
+[ext_resource type="Script" path="res://src/perf/resolution_governor.gd" id="5"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1")
@@ -2190,14 +2318,13 @@ script = ExtResource("1")
 script = ExtResource("4")
 
 [node name="ResolutionGovernor" type="Node" parent="."]
-script = ExtResource("res://src/perf/resolution_governor.gd")
+script = ExtResource("5")
 
 [node name="ControlsPanel" parent="." instance=ExtResource("3")]
 ```
 
-> The `ResolutionGovernor` node uses an inline `script =` path string; if Godot
-> complains, add it as an `[ext_resource]` like the others. After writing,
-> `godot4 --headless --import --path .`.
+> After writing, `godot4 --headless --import --path .`. Tasks 11 and 12 add the
+> `OrbitCamera` and `JuliaMarker` children to this scene.
 
 - [ ] **Step 5: Run test to verify it passes**
 
@@ -2231,10 +2358,13 @@ CPU march to pick the centre on mode switch and on click.
 
 **Interfaces:**
 - Consumes: `FractalParams`, `CameraState`, `DistanceEstimator`.
-- Produces: `class_name OrbitCamera extends Node` with `setup(params, camera)`,
-  `enabled: bool`, `center: Vector3`, `enter()`, `rotate_view(dx, dy)`,
-  `pan(dx, dy)`, `dolly(dy)`, `zoom(up: bool, dir: Vector3)`,
-  `recenter_on(hit: Vector3)`, and a private CPU march.
+- Consumes also: `FractalView` (for `unproject`, to turn a cursor pixel into a
+  world ray for click-recentre and wheel-zoom).
+- Produces: `class_name OrbitCamera extends Node` with
+  `setup(params, camera, view)`, `enabled: bool`, `center: Vector3`,
+  `handle_event(event: InputEvent) -> bool` (Main dispatches mouse events here),
+  `enter()`, `rotate_view(dx, dy)`, `pan(dx, dy)`, `dolly(dy)`,
+  `zoom(up: bool, dir: Vector3)`, `recenter_on(hit: Vector3)`, and a private CPU march.
 
 > **CPU-march note (design choice):** the shader marches in two phases for
 > shading; the orbit camera only needs a surface *point*, so its private march
@@ -2253,9 +2383,14 @@ extends "res://tests/test_case.gd"
 func run() -> void:
 	var params := FractalParams.new()
 	var cam := CameraState.make_default()
+	var view: FractalView = load("res://src/fractal/fractal_view.tscn").instantiate()
+	root.add_child(view)
+	view.size = Vector2(1280, 800)
+	view.setup(params, cam)
 	var orbit := OrbitCamera.new()
 	root.add_child(orbit)
-	orbit.setup(params, cam)
+	orbit.setup(params, cam, view)
+	orbit.enabled = true
 	orbit.center = Vector3.ZERO
 	await frames(1)
 
@@ -2263,6 +2398,12 @@ func run() -> void:
 	var d0 := cam.eye().distance_to(orbit.center)
 	orbit.rotate_view(50.0, 20.0)
 	check_approx(cam.eye().distance_to(orbit.center), d0, "rotation preserves orbit distance", 1e-4)
+
+	# --- a vertical drag actually changes the eye's height over the centre ---
+	var z0 := (cam.eye() - orbit.center).z
+	orbit.rotate_view(0.0, 50.0)
+	check(absf((cam.eye() - orbit.center).z - z0) > 0.1,
+		"vertical drag changes the eye height over centre (got dz %s)" % ((cam.eye() - orbit.center).z - z0))
 
 	# --- pan moves camera and centre together ---
 	var eye_before := cam.eye()
@@ -2279,11 +2420,43 @@ func run() -> void:
 	check((cam.eye() - orbit.center).normalized().is_equal_approx(dir_before),
 		"dolly keeps the view direction")
 
-	# --- click re-centres onto a hit ---
+	# --- recenter helper ---
 	orbit.recenter_on(Vector3(0.1, 0.2, 0.3))
 	check(orbit.center.is_equal_approx(Vector3(0.1, 0.2, 0.3)), "recenter sets the centre to the hit")
 
+	# --- handle_event: a left-drag rotates the camera ---
+	orbit.center = Vector3.ZERO
+	var eye0 := cam.eye()
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT; press.pressed = true; press.position = Vector2(640, 400)
+	check(orbit.handle_event(press), "left press is consumed")
+	var motion := InputEventMouseMotion.new()
+	motion.relative = Vector2(60, 0); motion.position = Vector2(700, 400)
+	orbit.handle_event(motion)
+	check(not cam.eye().is_equal_approx(eye0), "left-drag rotates the camera")
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT; release.pressed = false; release.position = Vector2(700, 400)
+	orbit.handle_event(release)
+
+	# --- handle_event: the wheel zooms (changes the distance) ---
+	var dpre := cam.eye().distance_to(orbit.center)
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = MOUSE_BUTTON_WHEEL_UP; wheel.pressed = true; wheel.position = Vector2(640, 400)
+	orbit.handle_event(wheel)
+	check(absf(cam.eye().distance_to(orbit.center) - dpre) > 1e-3, "wheel zoom changes the distance")
+
+	# --- handle_event: a click (press+release, no drag) recentres ---
+	orbit.center = Vector3(5, 5, 5)
+	var cp := InputEventMouseButton.new()
+	cp.button_index = MOUSE_BUTTON_LEFT; cp.pressed = true; cp.position = Vector2(640, 400)
+	orbit.handle_event(cp)
+	var cr := InputEventMouseButton.new()
+	cr.button_index = MOUSE_BUTTON_LEFT; cr.pressed = false; cr.position = Vector2(640, 400)
+	orbit.handle_event(cr)
+	check(not orbit.center.is_equal_approx(Vector3(5, 5, 5)), "a click recentres (onto a hit or the origin)")
+
 	orbit.queue_free()
+	view.queue_free()
 	await frames(1)
 ```
 
@@ -2299,32 +2472,80 @@ class_name OrbitCamera
 extends Node
 ## The site's orbit controller. Keeps a `center`; rotation orbits it, pan moves
 ## both camera and centre, dolly/zoom change the distance. The mouse is never
-## captured in this mode.
+## captured in this mode. Main dispatches mouse events to handle_event().
 
 const WORLD_UP := Vector3(0, 0, 1)
-const MIN_PITCH_MARGIN_DEG := 1.0
+const MAX_FORWARD_Z := 0.9998476951563913   # sin(89 deg): keep forward 1 deg off +/-Z
 const ROT_PER_PIXEL := 0.5          # degrees per pixel at sensitivity 0.1
 const PAN_PER_PIXEL := 0.001        # * distance_to_center
 const DOLLY_PER_PIXEL := 0.005      # * distance_to_center
 const ZOOM_PER_TICK := 0.1          # * distance_to_center
+const CLICK_SLOP := 4.0             # px of motion below which a release is a click
 
 var enabled := false
 var center := Vector3.ZERO
 
 var _params: FractalParams
 var _camera: CameraState
+var _view: FractalView
+var _left := false
+var _right := false
+var _moved := 0.0
 
 
-func setup(params: FractalParams, camera: CameraState) -> void:
+func setup(params: FractalParams, camera: CameraState, view: FractalView) -> void:
 	_params = params
 	_camera = camera
+	_view = view
+
+
+## Main's single dispatcher calls this. Returns true when consumed.
+func handle_event(event: InputEvent) -> bool:
+	if not enabled:
+		return false
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				_left = true
+				_moved = 0.0
+			else:
+				var was := _left
+				_left = false
+				if was and _moved < CLICK_SLOP:
+					_click(event.position)
+				return was
+			return true
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_right = event.pressed
+			return true
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			zoom(true, _cursor_dir(event.position))
+			return true
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			zoom(false, _cursor_dir(event.position))
+			return true
+	elif event is InputEventMouseMotion:
+		var d: Vector2 = event.relative
+		if _left:
+			_moved += d.length()
+			if event.shift_pressed:
+				pan(d.x, d.y)
+			elif event.alt_pressed:
+				dolly(d.y)
+			else:
+				rotate_view(d.x, d.y)
+			return true
+		elif _right:
+			dolly(d.y)
+			return true
+	return false
 
 
 ## On switching into ORBIT: centre on the surface hit by the centre ray, or the
 ## origin if that march runs past twice the current distance to the origin.
 func enter() -> void:
 	var dist_origin := _camera.eye().length()
-	var hit := _march(_camera.eye(), _camera.forward())
+	var hit: Variant = _march(_camera.eye(), _camera.forward())
 	if hit != null and (hit as Vector3).distance_to(_camera.eye()) <= 2.0 * maxf(dist_origin, 1e-6):
 		center = hit
 	else:
@@ -2342,9 +2563,8 @@ func rotate_view(dx: float, dy: float) -> void:
 	# clamp pitch: keep the view direction away from +/-Z
 	var new_eye := center + offset
 	var fwd := (center - new_eye).normalized()
-	var max_cos := cos(deg_to_rad(90.0 - MIN_PITCH_MARGIN_DEG))
-	if absf(fwd.z) > max_cos:
-		# undo the pitch component by re-rotating without it
+	if absf(fwd.z) > MAX_FORWARD_Z:
+		# too steep: keep the yaw, drop the pitch for this step
 		offset = (_camera.eye() - center).rotated(WORLD_UP, yaw)
 		new_eye = center + offset
 	_look_from(new_eye)
@@ -2379,6 +2599,22 @@ func recenter_on(hit: Vector3) -> void:
 	center = hit
 
 
+## A click (press without drag): march the cursor ray; recentre on the hit when
+## it is within twice the current eye-to-centre distance, else onto the origin.
+func _click(pixel: Vector2) -> void:
+	var dir := _cursor_dir(pixel)
+	var hit: Variant = _march(_camera.eye(), dir)
+	var dist_c := _camera.eye().distance_to(center)
+	if hit != null and (hit as Vector3).distance_to(_camera.eye()) <= 2.0 * maxf(dist_c, 1e-6):
+		center = hit
+	else:
+		center = Vector3.ZERO
+
+
+func _cursor_dir(pixel: Vector2) -> Vector3:
+	return (_view.unproject(pixel, 1.0) - _camera.eye()).normalized()
+
+
 func _look_from(eye: Vector3) -> void:
 	var t := Transform3D(Basis.IDENTITY, eye)
 	_camera.transform = t.looking_at(center, WORLD_UP)
@@ -2403,7 +2639,9 @@ func _march(ro: Vector3, rd: Vector3) -> Variant:
 
 
 func _box(ro: Vector3, rd: Vector3, half_size: float) -> Vector2:
-	var inv := Vector3(1.0 / rd.x, 1.0 / rd.y, 1.0 / rd.z)
+	var sgn := Vector3(1.0 if rd.x >= 0.0 else -1.0, 1.0 if rd.y >= 0.0 else -1.0, 1.0 if rd.z >= 0.0 else -1.0)
+	var safe := sgn * Vector3(maxf(absf(rd.x), 1e-9), maxf(absf(rd.y), 1e-9), maxf(absf(rd.z), 1e-9))
+	var inv := Vector3(1.0 / safe.x, 1.0 / safe.y, 1.0 / safe.z)
 	var n := inv * ro
 	var k := inv.abs() * half_size
 	var t1 := -n - k
@@ -2416,8 +2654,9 @@ func _box(ro: Vector3, rd: Vector3, half_size: float) -> Vector2:
 - [ ] **Step 4: Add `OrbitCamera` to `src/main.tscn`**
 
 Add a child node `OrbitCamera` (type Node) with the `orbit_camera.gd` script, as
-a sibling of `FlyCamera`. `main.gd` already calls `setup`, `enter`, and toggles
-`enabled` for it. Then `godot4 --headless --import --path .`.
+a sibling of `FlyCamera`. `main.gd` already calls `setup(params, camera, view)`,
+`enter`, `handle_event`, and toggles `enabled` for it. Then
+`godot4 --headless --import --path .`.
 
 - [ ] **Step 5: Run tests to verify they pass**
 
@@ -2448,10 +2687,11 @@ free) to move the point in the plane facing the camera.
 - Modify: `src/main.tscn` (add the `JuliaMarker` child; `main.gd` already wires it).
 
 **Interfaces:**
-- Consumes: `FractalParams`, `FractalView`.
-- Produces: `class_name JuliaMarker extends Control` with `setup(params, view)`,
-  `screen_point() -> Variant` (Vector2 or null), `begin_drag(mouse: Vector2) -> bool`,
-  `update_drag(mouse: Vector2)`.
+- Consumes: `FractalParams`, `CameraState`, `FractalView`.
+- Produces: `class_name JuliaMarker extends Control` with
+  `setup(params, camera, view)`, `screen_point() -> Variant` (Vector2 or null),
+  `begin_drag(mouse: Vector2) -> bool`, `update_drag(mouse: Vector2)`,
+  `end_drag()`, `is_dragging() -> bool`. Main dispatches the mouse events.
 
 > **Why a test here (not in the spec's test table):** the spec lists no
 > `julia_marker_test`, but TDD requires a failing test first. This test exercises
@@ -2474,7 +2714,7 @@ func run() -> void:
 	var marker := JuliaMarker.new()
 	root.add_child(marker)
 	marker.size = Vector2(1280, 800)
-	marker.setup(params, view)
+	marker.setup(params, cam, view)
 	await frames(1)
 
 	# hidden unless Julia is on
@@ -2521,16 +2761,18 @@ extends Control
 const RING_RADIUS := 10.0
 
 var _params: FractalParams
+var _camera: CameraState
 var _view: FractalView
 var _dragging := false
 var _drag_depth := 0.0
 
 
-func setup(params: FractalParams, view: FractalView) -> void:
+func setup(params: FractalParams, camera: CameraState, view: FractalView) -> void:
 	_params = params
+	_camera = camera
 	_view = view
 	params.changed.connect(_on_changed)
-	view._camera.changed.connect(queue_redraw) if view._camera else null
+	camera.changed.connect(queue_redraw)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_on_changed()
 
@@ -2553,8 +2795,8 @@ func begin_drag(mouse: Vector2) -> bool:
 	var sp: Variant = screen_point()
 	if sp == null or (sp as Vector2).distance_to(mouse) > RING_RADIUS * 2.0:
 		return false
-	var rel := _params.julia_point - _view._camera.eye()
-	_drag_depth = rel.dot(_view._camera.forward())
+	var rel := _params.julia_point - _camera.eye()
+	_drag_depth = rel.dot(_camera.forward())
 	_dragging = true
 	return true
 
@@ -2569,6 +2811,10 @@ func end_drag() -> void:
 	_dragging = false
 
 
+func is_dragging() -> bool:
+	return _dragging
+
+
 func _draw() -> void:
 	if not _params.julia_enabled:
 		return
@@ -2577,18 +2823,19 @@ func _draw() -> void:
 		draw_arc(sp, RING_RADIUS, 0.0, TAU, 32, Color.WHITE, 2.0, true)
 ```
 
-> `_view._camera` and `_view.unproject` are used directly; `FractalView` exposes
-> `unproject`/`project` publicly, and `_camera` is read-only access for depth and
-> the redraw hookup. If you prefer not to reach into `_camera`, add a public
-> `FractalView.camera_depth(point) -> float` and use it — behaviour is identical.
+> The marker takes `CameraState` directly (for the drag depth and the redraw
+> hookup) and uses only `FractalView`'s public `project`/`unproject`; it never
+> reaches into `FractalView`'s private `_camera`.
 
 - [ ] **Step 4: Add `JuliaMarker` to `src/main.tscn`**
 
-Add a child `JuliaMarker` (type Control, full-rect) with the script, *after*
-`FractalView` so it draws on top. Wire it in `main.gd`'s `_ready` (already
-guarded via `get_node_or_null("JuliaMarker")`), and route left-press/drag/release
-to `begin_drag`/`update_drag`/`end_drag` when the mouse is free. Then
-`godot4 --headless --import --path .`.
+Add a child `JuliaMarker` (type Control, full-rect) with the script, as the last
+child (so it draws on top). Its `_ready` wiring in `main.gd`
+(`get_node_or_null("JuliaMarker")` → `setup(params, camera, view)`) already
+exists from Task 10, and Main's single `_unhandled_input` already routes
+left-press → `begin_drag`, motion → `update_drag` (while `is_dragging()`), and
+release → `end_drag` when the mouse is free. No per-node `_input` on the marker.
+Then `godot4 --headless --import --path .`.
 
 - [ ] **Step 5: Run test to verify it passes**
 
@@ -2865,7 +3112,9 @@ progressive_web_app/enabled=false
 
 - [ ] **Step 3: Verify the preset loads**
 
-Run: `godot4 --headless --path . --export-release Web build/web/index.html`
+Run: `mkdir -p build/web && godot4 --headless --path . --export-release Web build/web/index.html`
+(The output directory must exist first, or the export errors before it even
+reaches the template check.)
 Expected one of:
 - Success: `build/web/index.html` (+ `.wasm`, `.pck`, `.js`) are written.
 - **Templates missing:** output contains `export templates` /
@@ -2916,7 +3165,7 @@ family should match. Note any gross mismatch in the final report.
 
 - [ ] **Step 4: Web export**
 
-Run: `godot4 --headless --path . --export-release Web build/web/index.html`
+Run: `mkdir -p build/web && godot4 --headless --path . --export-release Web build/web/index.html`
 Expected: either the files are written to `build/web/`, or the output reports
 missing export templates. **If templates are missing, report that fact — do not
 fail the task.**
@@ -2950,11 +3199,13 @@ and whether the web export produced files or reported missing templates.
   2-12) plus screenshots (Task 13); README (Task 14). Non-goals (Save Image,
   Copy URL, High DPI, reset, touch) are intentionally absent.
 - **Deliberate choices / spec deviations** (also in the final report): (1) the
-  DistanceEstimator test loosens the spec's 1e-5 tolerance to 2e-3 and 1e-4 for
-  two provably chaotic near-surface fixtures, measured during planning; (2) the
-  shader-compile assertion lives in `shader_test.gd` and `fractal_view_test.gd`
-  checks the view's material carries it, rather than both living in one file;
-  (3) the OrbitCamera CPU march is single-phase (surface point only); (4) a
+  DistanceEstimator keeps the spec's `estimate(p: Vector3, …)` as the public API
+  but adds a 64-bit scalar core `estimate_at(px, py, pz, …)` that the fixtures
+  pin, so all 24 rows hold the spec's 1e-5 tolerance (`Vector3` is 32-bit, which
+  would otherwise lose the two near-surface rows); (2) the shader-compile
+  assertion lives in `shader_test.gd` and `fractal_view_test.gd` checks the
+  view's material carries it, rather than both living in one file; (3) the
+  OrbitCamera CPU march is single-phase (surface point only); (4) a
   `julia_marker_test` is added though the spec's table omits it; (5) CameraState
   has its own small test though the spec folds it into fly-camera.
 - **Type consistency.** `FractalView.project/unproject`, `set_render_scale`,
