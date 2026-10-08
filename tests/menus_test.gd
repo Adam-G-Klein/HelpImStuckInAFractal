@@ -43,6 +43,49 @@ func run() -> void:
 
 	menu.queue_free()
 	await frames(1)
+
+	# --- the pause menu's controls block: Save/Load/Camera/Fast/Noise ---
+	# Untyped (like MainMenu above): naming PauseMenu would compile its
+	# SettingsMenu/Settings-autoload dependency at this test's own compile time.
+	var params := FractalParams.new()
+	var pause = load("res://src/ui/pause_menu.gd").new()
+	root.add_child(pause)
+	pause.setup(params)
+	await frames(1)
+	check_eq(pause.save_button.text, "Save view…", "pause menu has a Save view button")
+	check_eq(pause.load_button.text, "Load view…", "pause menu has a Load view button")
+	check_eq(pause.noise_button.text, "Noise editor…", "pause menu has a Noise editor button")
+	check(pause.camera_option.item_count == 2, "pause menu has a Camera option (Fly / Orbit)")
+	check(pause.fast_check != null, "pause menu has a Fast Controls checkbox")
+	# the camera option writes params
+	pause.camera_option.select(1)
+	pause.camera_option.item_selected.emit(1)
+	check_eq(params.camera_mode, FractalParams.CameraMode.ORBIT, "the Camera option writes params.camera_mode")
+	# the fast checkbox writes params
+	pause.fast_check.button_pressed = false
+	pause.fast_check.toggled.emit(false)
+	check_eq(params.fast_controls, false, "the Fast Controls checkbox writes params.fast_controls")
+	# external change refreshes the widgets
+	params.camera_mode = FractalParams.CameraMode.FLY
+	await frames(1)
+	check_eq(pause.camera_option.selected, 0, "an external camera-mode change refreshes the option")
+	# the file name and status helpers
+	pause.show_file("my_view.json")
+	check_eq(pause.file_label.text, "my_view.json", "show_file names the current save")
+	pause.show_status("Saved my_view.json")
+	check(pause.status_label.visible and pause.status_label.text.begins_with("Saved"), "show_status reports a line")
+	# save/load/noise emit their signals
+	var fired := {}
+	pause.save_requested.connect(func(): fired["save"] = true)
+	pause.load_requested.connect(func(): fired["load"] = true)
+	pause.noise_requested.connect(func(): fired["noise"] = true)
+	pause.save_button.pressed.emit()
+	pause.load_button.pressed.emit()
+	pause.noise_button.pressed.emit()
+	check(fired.has("save") and fired.has("load") and fired.has("noise"), "Save/Load/Noise emit their signals")
+	pause.queue_free()
+	await frames(1)
+
 	settings.mouse_sensitivity = original
 	await frames(1)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TMP))
