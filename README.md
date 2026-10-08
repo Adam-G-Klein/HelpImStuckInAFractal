@@ -27,8 +27,8 @@ binary.
 
 ## Controls
 
-Tap **Ctrl** to open the **console**. It splits into the **Shape** inspector,
-with a row for every Mandelbox knob, and the **Movement** pane of virtual axes.
+Tap **Ctrl** to open the **console**: the **Shape** inspector, with a row for
+every Mandelbox knob, stacked above the **Movement** pane of virtual axes.
 Everything the console does not own is driven directly by the mouse and
 keyboard. Press **Escape** to pause: the pause menu offers Save view / Load
 view, the Camera mode, Fast Controls, Console and Noise editor buttons, and
@@ -121,7 +121,9 @@ captured in this mode.
 ### Console (Ctrl)
 
 A Ctrl tap (or the pause menu's **Console…** button) opens the console, a
-window inside the main window split **Shape | Movement**.
+window inside the main window: the **Shape** pane on top, taking the full width
+and most of the height, and the **Movement** pane below it at its natural
+height (drag the bar between them to share the height differently).
 
 **Shape pane.** One row per Mandelbox knob, grouped **Box** / **Julia** /
 **Iteration rotation** / **Render**:

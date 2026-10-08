@@ -1,8 +1,13 @@
 class_name ConsoleWindow
 extends Window
-## The console ("Fractacular embedded"): an HSplit of the Shape inspector and
-## the Movement pane, over the one Mandelbox shape being flown through in the
-## main window. It is a window embedded in the main window (the project sets
+## The console ("Fractacular embedded") for the one Mandelbox shape being flown
+## through in the main window: the Shape inspector stacked above the Movement
+## pane in a VSplit. Stacked, the inspector gets the full width, so its sliders
+## have room (side by side, the two panes' minimum widths overflowed the
+## window); the Movement pane keeps its natural height (a line per axis and a
+## few readouts) and the inspector takes the rest.
+##
+## It is a window embedded in the main window (the project sets
 ## embed_subwindows = true, as headless and the web always do): dragged within
 ## it by its title bar, closed with its ✕, always drawn above the view. Native
 ## OS sub-windows corrupted the main window's picture on macOS. A Ctrl tap in
@@ -35,17 +40,19 @@ func setup(table: AttributeTable, keymap: Keymap, clock: Clock, group_tooltips: 
 	visible = false
 	close_requested.connect(hide_console)
 
-	var split := HSplitContainer.new()
+	var split := VSplitContainer.new()
 	split.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(split)
 
 	_inspector = AttributeInspector.new()
 	_inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_inspector.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	split.add_child(_inspector)
 	_inspector.setup(table, group_tooltips)
 
 	_movement = MovementPane.new()
 	_movement.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_movement.size_flags_vertical = Control.SIZE_FILL
 	_movement.setup(keymap, clock, speed_source)
 	split.add_child(_movement)
 

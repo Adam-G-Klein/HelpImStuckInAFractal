@@ -7,11 +7,10 @@ extends "res://tests/ui_test_case.gd"
 ## a spin box and pressing Enter writes the table; and the Movement pane's Add
 ## axis, key capture, rename, zero and remove all work by clicks and keys.
 ##
-## Two layout defects are recorded as known bugs (see `_layout_at_default_width`):
-## at the console's default 1000 px width the Shape sliders collapse to their
-## 16 px grabber and the Movement pane runs past the window's right edge. The
-## slider and Movement checks therefore run after the player widens the window
-## and drags the split handle, which is the workaround today.
+## At the console's default size the Shape inspector spans the full width above
+## the Movement pane, so the sliders are wide enough to drag and every axis
+## line, its ✕ included, lies inside the window; the slider and Movement checks
+## run at that size.
 
 var ui: UiDriver
 var table: AttributeTable
@@ -43,8 +42,7 @@ func run() -> void:
 	await _colour_dropdown()
 	await _source_dropdown()
 	await _spin_typing()
-	await _layout_at_default_width()
-	await _widen_and_drag_split()
+	await _layout_at_default_size()
 	await _slider_click_and_drag()
 	await _movement_pane()
 
@@ -164,52 +162,31 @@ func _source_dropdown() -> void:
 	km.axes().set_value(&"a", 0.0)
 
 
-func _layout_at_default_width() -> void:
-	console.size = Vector2i(ConsoleWindow.DEFAULT_SIZE.x, 400)
+func _layout_at_default_size() -> void:
+	console.size = ConsoleWindow.DEFAULT_SIZE
+	console.open()   # re-centred over the main window at its new size
 	await ui.frames(2)
-	var slider := console.inspector().row(&"box_scale").value_control() as HSlider
-	# BUG: the Shape rows' fixed widgets (label 140, spin 92, source/gain/wave/
-	# period ~350) fill the inspector's 643 px minimum, and the HSplit never gives
-	# the inspector more than that below ~1300 px, so every slider is squeezed to
-	# its 16 px grabber at the default console width: it cannot be dragged.
-	known_bug(slider.size.x >= 100.0,
-		"at the default console width a Shape slider is wide enough to drag (%.0f px)" % slider.size.x,
-		"AttributeRow sliders collapse to 16 px because the inspector is held at its 643 px minimum")
-	var pane := console.movement_pane()
-	var right := float(console.position.x + console.size.x)
-	var remove := pane.axis_line(&"a")["remove"] as Control
-	# BUG: inspector minimum (643) + split handle (12) + Movement pane minimum
-	# (401) = 1056 px > the 1000 px default width (wrap_controls is off), so the
-	# Movement pane runs 56 px past the window's right edge: the negative-key and
-	# remove buttons of every axis line are drawn outside the window and cannot
-	# be clicked.
-	known_bug(ui.global_rect(pane).end.x <= right + 0.5,
-		"at the default console width the Movement pane fits in the window (ends at %.0f, window %.0f)" % [ui.global_rect(pane).end.x, right],
-		"content minimum width 1056 px exceeds ConsoleWindow.DEFAULT_SIZE.x 1000")
-	known_bug(ui.global_rect(remove).end.x <= right,
-		"at the default console width an axis's remove button is inside the window (x %.0f..%.0f, window right %.0f)" % [
-			ui.global_rect(remove).position.x, ui.global_rect(remove).end.x, right],
-		"the ✕ button lies past the console's right edge")
-
-
-## The workaround a player has today: widen the console, then drag the split
-## handle right so the Shape pane gets the room.
-func _widen_and_drag_split() -> void:
-	console.size = Vector2i(1260, 400)
-	console.position = Vector2i(10, 200)
-	await ui.frames(2)
+	var win := Rect2(ui.window_origin(console), Vector2(console.size))
+	check(root.get_visible_rect().encloses(win), "at its default size the console fits in the main window (%s)" % win)
 	var inspector := console.inspector()
 	var pane := console.movement_pane()
-	var right := float(console.position.x + console.size.x)
-	check(ui.global_rect(pane).end.x <= right + 0.5, "at 1260 px the Movement pane fits in the window")
-	var before := inspector.size.x
-	var handle := Vector2((ui.global_rect(inspector).end.x + ui.global_rect(pane).position.x) * 0.5,
-		ui.global_rect(inspector).get_center().y)
-	await ui.drag(handle, handle + Vector2(300, 0))
-	await ui.frames(1)
-	check(inspector.size.x > before + 100.0, "dragging the split handle right widens the Shape pane (%.0f -> %.0f)" % [before, inspector.size.x])
-	var slider := inspector.row(&"fold_limit").value_control() as HSlider
-	check(slider.size.x >= 100.0, "…and gives the sliders room (%.0f px)" % slider.size.x)
+	check(ui.global_rect(inspector).size.x >= console.size.x - 20.0,
+		"the Shape inspector spans the console's width (%.0f of %d)" % [ui.global_rect(inspector).size.x, console.size.x])
+	check(ui.global_rect(pane).position.y >= ui.global_rect(inspector).end.y,
+		"the Movement pane sits below it")
+	check(ui.global_rect(inspector).size.y > ui.global_rect(pane).size.y,
+		"and the inspector gets most of the height (%.0f over %.0f)" % [ui.global_rect(inspector).size.y, ui.global_rect(pane).size.y])
+	for id in [&"box_scale", &"fold_limit", &"color_mode"]:
+		var c := inspector.row(id).value_control()
+		if c is HSlider:
+			check(c.size.x >= 200.0, "the %s slider is wide enough to drag (%.0f px)" % [id, c.size.x])
+	check(win.encloses(ui.global_rect(pane)),
+		"the Movement pane lies wholly inside the window (%s in %s)" % [ui.global_rect(pane), win])
+	for id in pane.line_ids():
+		var line := pane.axis_line(id)
+		for key in ["label", "zero", "pos", "neg", "remove"]:
+			var w := line[key] as Control
+			check(win.encloses(ui.global_rect(w)), "axis %s: its %s widget is inside the window (%s)" % [id, key, ui.global_rect(w)])
 
 
 func _slider_click_and_drag() -> void:
@@ -279,10 +256,13 @@ func _movement_pane() -> void:
 	await ui.click(line["zero"])
 	check_approx(km.axes().value(id), 0.0, "a click on 0 zeroes the axis")
 
-	# the remove button drops it, and the dropdowns follow
+	# the remove button (inside the window at the default size) drops it, and
+	# the dropdowns follow
+	var win := Rect2(ui.window_origin(console), Vector2(console.size))
+	check(win.encloses(ui.global_rect(line["remove"])), "the new line's ✕ is inside the window")
 	await ui.click(line["remove"])
 	await ui.frames(2)
-	check(not km.axes().has(id), "a click on ✕ removes the axis")
+	check(not km.axes().has(id), "a click on ✕ removes the axis at the default console size")
 	texts.clear()
 	for i in src.item_count:
 		texts.append(src.get_item_text(i))
