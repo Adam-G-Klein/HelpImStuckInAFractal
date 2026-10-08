@@ -1,11 +1,13 @@
 class_name FlyCamera
 extends Node
 ## Free-fly camera: mouse-look (yaw about world +Z, pitch about the camera's own
-## right, no roll) and WASD/Space/Shift movement whose speed scales with the
-## distance to the nearest surface. Reads and writes a shared CameraState.
+## right, no roll) and WASD + Space/Backspace (up/down) movement whose speed
+## scales with the distance to the nearest surface; holding Shift sprints.
+## Reads and writes a shared CameraState.
 
 const WORLD_UP := Vector3(0, 0, 1)
 const MAX_FORWARD_Z := 0.9998476951563913   # sin(89 deg): keep forward 1 deg off +/-Z
+const SPRINT_MULTIPLIER := 4.0               # Shift (the "sprint" action) scales travel speed
 
 var enabled := false
 ## The load shedder's cap on travel speed: 1.0 normally, lower at its top level.
@@ -72,7 +74,8 @@ func apply_look(dx: float, dy: float) -> void:
 
 
 ## Unit movement direction in world space from the six actions (camera axes).
-## Nothing while Cmd or Ctrl is held: Cmd+S saves, and S alone is move_back.
+## Nothing while Cmd or Ctrl is held: Cmd+S saves, a Ctrl tap toggles the panel,
+## and S alone is move_back.
 func move_direction() -> Vector3:
 	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL):
 		return Vector3.ZERO
@@ -86,10 +89,14 @@ func move_direction() -> Vector3:
 
 
 ## Travel speed: ~one second covers the distance to the nearest surface, times
-## the load shedder's speed_limit.
+## the load shedder's speed_limit. Holding Shift (the "sprint" action)
+## multiplies it by SPRINT_MULTIPLIER.
 func current_speed() -> float:
 	var d := DistanceEstimator.estimate(_camera.eye(), _params)
-	return clampf(d, 1e-6, 20.0) * _camera.speed_factor * speed_limit
+	var speed := clampf(d, 1e-6, 20.0) * _camera.speed_factor * speed_limit
+	if Input.is_action_pressed("sprint"):
+		speed *= SPRINT_MULTIPLIER
+	return speed
 
 
 func scroll(up: bool) -> void:

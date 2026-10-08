@@ -25,7 +25,7 @@ binary.
 
 ## Controls
 
-Press **Q** to open the controls panel. Everything the panel does not own is
+Tap **Ctrl** to open the controls panel. Everything the panel does not own is
 driven directly by the mouse and keyboard. Press **Escape** to pause: the pause
 menu offers Resume, Settings and Back to Menu, and Escape again steps back out.
 
@@ -77,11 +77,12 @@ while a level is active.
 
 | key / action | what it does |
 |---|---|
-| **Q** | toggle the controls panel (also releases/recaptures the mouse) |
+| **Ctrl** (tap) | toggle the controls panel (also releases/recaptures the mouse); fires on release, so Ctrl+S and Ctrl+P still work |
 | **N** | toggle the noise-field editor (also releases/recaptures the mouse) |
 | **Escape** | pause menu (releases the mouse; resuming recaptures it) |
 | **W / A / S / D** | move forward / left / back / right |
-| **Space / Shift** | move up / down (world-relative to the camera's own up) |
+| **Space / Backspace** | move up / down (world-relative to the camera's own up) |
+| **Shift** (hold) | sprint — multiply the travel speed by 4 while held |
 | mouse move | mouse-look while captured (yaw about world +Z, pitch about the camera's right; no roll) |
 | mouse wheel | adjust the speed factor (×1.25 per tick up, ÷1.25 down; clamped 0.01–100) |
 | click | with the mouse free, click the view to hide the panel and recapture the mouse |
@@ -103,7 +104,7 @@ captured in this mode.
 | mouse wheel | zoom toward the point under the cursor |
 | click (no drag) | re-centre on the surface under the cursor (or the origin if nothing is hit nearby) |
 
-### Controls panel (Q)
+### Controls panel (Ctrl)
 
 | row | controls |
 |---|---|
@@ -146,7 +147,7 @@ are. An exported build cannot write into the project, so it saves to
 
 ## Noise fields
 
-Press **N** (or the **Noise editor…** button in the Q panel) to open the
+Press **N** (or the **Noise editor…** button in the controls panel) to open the
 noise-field editor: an in-app node graph, ported from Fractacular's Isolation
 window, that builds a 3D scalar field and overlays it on the Mandelbox. Wiring it
 to the **Output** node does two things to the picture, live as you edit:
@@ -158,7 +159,7 @@ to the **Output** node does two things to the picture, live as you edit:
 - **Tint** — the surface colour is blended toward the Output's **Tint colour** by
   the field, scaled by **Tint strength**.
 
-Opening the editor frees the mouse the way the Q panel does; a click in the view
+Opening the editor frees the mouse the way the controls panel does; a click in the view
 in Fly mode closes it and recaptures. **Orbit** mode (Camera dropdown) is the
 comfortable way to author, since the mouse is never captured. Each node with an
 output carries a live preview — a flat slice of the field — and the toolbar's

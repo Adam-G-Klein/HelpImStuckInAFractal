@@ -1,6 +1,15 @@
 extends "res://tests/test_case.gd"
 
 
+## A non-echo physical key event for feeding Main._unhandled_input directly.
+func _key(physical_keycode: int, pressed: bool) -> InputEventKey:
+	var ev := InputEventKey.new()
+	ev.physical_keycode = physical_keycode
+	ev.pressed = pressed
+	ev.echo = false
+	return ev
+
+
 func run() -> void:
 	var settings: Node = root.get_node("Settings")
 	var original_sens: float = settings.mouse_sensitivity
@@ -17,11 +26,37 @@ func run() -> void:
 	check(not panel.visible, "panel starts hidden")
 	check(fly.enabled, "fly camera is enabled in FLY mode")
 
-	# Q toggles the panel
-	await press_action("toggle_panel")
-	check(panel.visible, "Q shows the panel")
-	await press_action("toggle_panel")
-	check(not panel.visible, "Q hides it again")
+	# A Ctrl tap (down then up, nothing between) toggles the panel
+	main._unhandled_input(_key(KEY_CTRL, true))
+	main._unhandled_input(_key(KEY_CTRL, false))
+	check(panel.visible, "a Ctrl tap shows the panel")
+	main._unhandled_input(_key(KEY_CTRL, true))
+	main._unhandled_input(_key(KEY_CTRL, false))
+	check(not panel.visible, "a Ctrl tap hides it again")
+
+	# Ctrl held while another key is pressed (a chord, e.g. Ctrl+S) does not toggle
+	main._unhandled_input(_key(KEY_CTRL, true))   # arm
+	main._unhandled_input(_key(KEY_S, true))      # chord key disarms
+	main._unhandled_input(_key(KEY_S, false))
+	main._unhandled_input(_key(KEY_CTRL, false))  # release: must not toggle
+	check(not panel.visible, "Ctrl+chord does not toggle the panel")
+
+	# Ctrl+P (the screenshot chord) is the sharp case: copy_screenshot consumes
+	# the P key-down, so the arming logic must run *before* it or the following
+	# Ctrl release would toggle the panel. Verify the arm is cleared by the P
+	# key-down even though copy_screenshot then handles it.
+	main._unhandled_input(_key(KEY_CTRL, true))   # arm
+	var p_down := _key(KEY_P, true)
+	p_down.ctrl_pressed = true                    # a real Ctrl+P, matches copy_screenshot
+	main._unhandled_input(p_down)
+	check(not main._ctrl_armed, "Ctrl+P disarms the toggle before the screenshot consumes it")
+	main._unhandled_input(_key(KEY_CTRL, false))  # release: must not toggle
+	check(not panel.visible, "Ctrl+P does not toggle the panel")
+
+	# Q no longer toggles anything
+	main._unhandled_input(_key(KEY_Q, true))
+	main._unhandled_input(_key(KEY_Q, false))
+	check(not panel.visible, "Q no longer toggles the panel")
 
 	# switching to ORBIT disables the fly camera and enables orbit
 	main.params.camera_mode = FractalParams.CameraMode.ORBIT
