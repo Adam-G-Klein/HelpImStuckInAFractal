@@ -127,6 +127,27 @@ next to it to eyeball the default view against the original — float32 and no
 HiDPI mean the pixels differ, but the shape and the blue colour family should
 match.
 
+## Systems viz
+
+`docs/viz/` is an in-browser, pannable, zoomable explainer of how the viewer
+works: the architecture, one input to one frame, the distance estimator fold
+by fold, every dial, the two-phase ray march, the colour modes, the two
+normals, the cameras and the resolution governor. Its live figures run
+JavaScript ports of the shader and the GDScript (checked at load against the
+24 distance-estimator fixtures), and every tooltip links the `file:line` it
+describes at a pinned commit.
+
+```bash
+./viz.sh                  # open it in your default browser
+./viz.sh mandelbox/5      # straight to a tab (1-based)
+node tools/viz/check.mjs --print --pane mandelbox   # every cited line exists at the pinned commit
+```
+
+It is a dependency-free static page that works from `file://`; the engine is
+ported from the sibling project spellfactory. Extend or refresh it with the
+`/visualize` skill (`.claude/skills/visualize/`). The links 404 until the
+pinned commit is pushed.
+
 ## Web export
 
 A single **Web** export preset (threads off) targets the git-ignored
