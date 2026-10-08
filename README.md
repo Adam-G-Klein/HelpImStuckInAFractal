@@ -300,9 +300,7 @@ primitive; `ui_console_test.gd` scrolls the Shape list, picks dropdown items,
 clicks and drags sliders, types values and edits axes; `ui_noise_test.gd` adds
 a node from the right-click menu, wires it, edits it live and saves and loads
 the graph; `ui_journey_test.gd` plays one session from the title menu to Back
-to Menu. A check that fails today because of a known defect is reported as
-`(known bug: …)` and marked `# BUG:` in the test; it prints a `NOTE` once the
-defect is fixed so the marker can be removed.
+to Menu.
 
 The reference capture from the site lives at
 **`docs/reference/icefractal-default.jpg`**. Put `screenshots/default_view.png`

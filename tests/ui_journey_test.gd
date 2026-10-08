@@ -1,4 +1,4 @@
-extends "res://tests/ui_test_case.gd"
+extends "res://tests/test_case.gd"
 ## One player session through the real scenes, driven only by synthetic mouse
 ## and keyboard input in a scaled headless root: Play from the title menu; a
 ## Ctrl tap opens the console and frees the mouse; typing into the Scale row
@@ -341,13 +341,10 @@ func _resize_requests_frame() -> void:
 	await ui.frames(2)
 	check_eq(Vector2i(view.size), Vector2i(1100, 700), "the view follows the resized window")
 	check_eq(view.viewport_size(), Vector2i(1100, 700), "its SubViewport is resized to match")
-	# BUG: FractalView._apply_size resizes the SubViewport (reallocating its
-	# texture) but never calls request_frame(), so once the UPDATE_ONCE frame has
-	# been consumed the resized target is never drawn: the window shows black
-	# until the camera or a parameter changes (spec finding 2).
-	known_bug(view._viewport.render_target_update_mode != SubViewport.UPDATE_DISABLED,
-		"a resize asks the view for a frame",
-		"FractalView._apply_size does not call request_frame()")
+	# _apply_size requests a frame whenever the pixel size changes, or the
+	# resized target would stay black until the camera or a parameter moved.
+	check(view._viewport.render_target_update_mode != SubViewport.UPDATE_DISABLED,
+		"a resize asks the view for a frame")
 	root.content_scale_size = UiDriver.SURFACE
 	await ui.frames(2)
 

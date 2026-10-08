@@ -1,4 +1,4 @@
-extends "res://tests/ui_test_case.gd"
+extends "res://tests/test_case.gd"
 ## The console driven like a player, in a scaled headless root: the wheel over a
 ## row label, a slider and an unfocused spin box scrolls the Shape list without
 ## changing any value; a trackpad pan scrolls; the Colour dropdown opens on a

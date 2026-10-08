@@ -1,4 +1,4 @@
-extends "res://tests/ui_test_case.gd"
+extends "res://tests/test_case.gd"
 ## The noise window driven like a player, in a scaled headless root: a
 ## right-click on the empty canvas opens the add menu and a click on "Value
 ## noise" adds that node, with a preview, where the click was; wiring it to
