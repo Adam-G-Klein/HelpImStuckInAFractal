@@ -1,10 +1,12 @@
 class_name Main
 extends Node
-## Wires the two resources into every child, selects the active camera from
-## camera_mode, owns the mouse capture, and is the single mouse-event dispatcher.
-## Also saves and loads views: WorkspaceFiles picks the file, Workspace does the
-## reading and writing, and the panel shows the result. Escape pauses the tree
-## and opens the PauseMenu; the mouse sensitivity follows the Settings autoload.
+## Wires the shape table, the keymap/axes, the clock and the console into every
+## child, selects the active camera from camera_mode, owns the mouse capture,
+## and is the single mouse-event dispatcher. Each frame it resolves the shape
+## table + axis values + clock into the params every consumer reads. Saving and
+## loading a view: WorkspaceFiles picks the file, Workspace does the reading and
+## writing, the pause menu shows the result. Escape pauses the tree and opens
+## the PauseMenu; a Ctrl tap opens the console.
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
@@ -12,30 +14,39 @@ var params: FractalParams
 var camera: CameraState
 
 @onready var view: FractalView = $FractalView
-@onready var panel: ControlsPanel = $ControlsPanel
 @onready var governor: ResolutionGovernor = $ResolutionGovernor
 @onready var fly: FlyCamera = $FlyCamera
 
 var _orbit: OrbitCamera
 var _marker: JuliaMarker
+var _table: AttributeTable
+var _keymap: Keymap
+var _axis_controller: AxisController
+var _clock: Clock
+var _console: ConsoleWindow
 var _last_mode := -1
 var _files: WorkspaceFiles
 var _pause: PauseMenu
 var _noise: NoiseWindow
 var _loading := false
-# toggle_panel is bound to Ctrl, which is also a chord modifier (Ctrl+S saves,
-# Ctrl+P screenshots), so the panel toggles on Ctrl *release* and only when Ctrl
-# was tapped alone: a bare Ctrl key-down arms this, any other key-down while held
-# disarms it.
-var _ctrl_armed := false
+## True once a Ctrl tap or a file panel has freed the mouse; a click in the view
+## clears it and recaptures. Capture no longer depends on the console's state.
+var _free_requested := false
+## The intended capture state. Tracked here rather than read back from
+## Input.mouse_mode, which a headless run cannot report as CAPTURED.
+var _captured := false
+var _ctrl := CtrlTap.new()
 
 
 func _ready() -> void:
 	params = FractalParams.new()
 	camera = CameraState.make_default()
 
+	_table = AttributeTable.new(MandelboxShape.specs())
+	_keymap = Keymap.new()
+	_keymap.load_file()   # saves/keymap.json, or the shipped default
+
 	view.setup(params, camera)
-	panel.setup(params, camera)
 	governor.setup(params, view)
 	governor.shed_level_changed.connect(_on_shed_level_changed)
 	fly.setup(params, camera)
@@ -45,21 +56,30 @@ func _ready() -> void:
 		_orbit.setup(params, camera, view)
 	_marker = get_node_or_null("JuliaMarker")
 	if _marker:
-		_marker.setup(params, camera, view)
+		_marker.setup(params, camera, view, _table)
+
+	_build_clock()
+	_build_console()
+	_build_axis_controller()
+
+	# The console and the main window are separate viewports; typing in either
+	# must silence WASD and the axis keys.
+	fly.set_text_viewports(_focus_viewports())
 
 	_build_workspace_files()
 	_build_pause_menu()
 	_build_noise_window()
 
-	# The sensitivity is the player's, not the view's: Settings owns it, and the
-	# panel's slider writes through params back into Settings.
+	# The sensitivity is the player's, not the view's: Settings owns it.
 	params.mouse_sensitivity = Settings.mouse_sensitivity
 	Settings.changed.connect(func(): params.mouse_sensitivity = Settings.mouse_sensitivity)
 	params.changed.connect(_sync_sensitivity_to_settings)
 
-	panel.visible = false
+	_ctrl.typing_guard = func() -> bool: return TextFocus.any(_focus_viewports())
+
 	params.changed.connect(_apply_mode)
 	camera.changed.connect(func(): governor.mark_changed())
+	_resolve_once()
 	_apply_mode()
 
 
@@ -75,16 +95,55 @@ func noise_window() -> NoiseWindow:
 	return _noise
 
 
-## The noise-field editor lives in an embedded window Main owns. Opening it frees
-## the mouse (like the Q panel); a click in the view in Fly mode closes it and the
-## panel and recaptures.
+func console() -> ConsoleWindow:
+	return _console
+
+
+func table() -> AttributeTable:
+	return _table
+
+
+func keymap() -> Keymap:
+	return _keymap
+
+
+# ------------------------------------------------------------- build helpers
+
+func _build_clock() -> void:
+	_clock = Clock.new()
+	_clock.name = "Clock"
+	add_child(_clock)
+
+
+func _build_console() -> void:
+	_console = ConsoleWindow.new()
+	_console.name = "ConsoleWindow"
+	_console.setup(_table, _keymap, _clock, MandelboxShape.group_tooltips(),
+		func() -> float: return camera.speed_factor)
+	add_child(_console)
+	_console.toggle_requested.connect(_on_console_toggle)
+
+
+func _build_axis_controller() -> void:
+	_axis_controller = AxisController.new()
+	_axis_controller.name = "AxisController"
+	_axis_controller.setup(_keymap, _focus_viewports())
+	add_child(_axis_controller)
+
+
+func _focus_viewports() -> Array:
+	var vps: Array = [get_viewport()]
+	if _console != null:
+		vps.append(_console)
+	return vps
+
+
 func _build_noise_window() -> void:
 	_noise = NoiseWindow.new()
 	_noise.name = "NoiseWindow"
 	add_child(_noise)
 	_noise.setup(view)
 	_noise.close_requested.connect(_update_mouse)
-	panel.noise_button.pressed.connect(_toggle_noise)
 
 
 func _toggle_noise() -> void:
@@ -96,12 +155,21 @@ func _build_pause_menu() -> void:
 	_pause = PauseMenu.new()
 	_pause.name = "PauseMenu"
 	add_child(_pause)
+	_pause.setup(params)
 	_pause.settings_menu.set_params(params)
 	# The Renderer tab edits params while the tree is paused. Keep the governor
 	# running so each edit still gets its full-resolution final frame.
 	governor.process_mode = Node.PROCESS_MODE_ALWAYS
 	_pause.resume_requested.connect(resume)
 	_pause.menu_requested.connect(back_to_menu)
+	_pause.save_requested.connect(_files.prompt_save)
+	_pause.load_requested.connect(_files.prompt_load)
+	_pause.noise_requested.connect(_open_noise_from_menu)
+
+
+func _open_noise_from_menu() -> void:
+	_noise.open()
+	resume()
 
 
 func pause() -> void:
@@ -126,18 +194,21 @@ func _sync_sensitivity_to_settings() -> void:
 		Settings.mouse_sensitivity = params.mouse_sensitivity
 
 
-## The buttons and the quick-save key only choose a file; the saving and
-## loading happen here, and the chosen file becomes current only if it worked.
+func _on_file_current_changed(display_name: String) -> void:
+	if _pause != null:
+		_pause.show_file(display_name)
+
+
 func _build_workspace_files() -> void:
 	_files = WorkspaceFiles.new()
 	_files.name = "WorkspaceFiles"
 	add_child(_files)
 	_files.save_to.connect(save_view_to)
 	_files.load_from.connect(load_view_from)
-	_files.current_changed.connect(panel.show_file)
+	_files.current_changed.connect(_on_file_current_changed)
 	_files.prompting.connect(_on_prompting)
-	panel.save_button.pressed.connect(_files.prompt_save)
-	panel.load_button.pressed.connect(_files.prompt_load)
+	if _pause != null:
+		_pause.show_file(_files.display_name())
 	var directory := WorkspaceFiles.directory()
 	if directory != WorkspaceFiles.REPO_DIR:
 		_report("Saves go to %s: this build cannot write into the project." % directory)
@@ -145,9 +216,27 @@ func _build_workspace_files() -> void:
 		_report("Could not create %s; the file panel opens at your home folder." % directory)
 
 
+# ------------------------------------------------------------- per-frame
+
+func _process(_delta: float) -> void:
+	_resolve_once()
+
+
+## Resolve the shape table + axis values + clock into params, and feed the
+## console's readouts. Cheap (about thirty scalars); apply_resolved emits at
+## most once, and nothing when no binding is active.
+func _resolve_once() -> void:
+	var values := BindingResolver.resolve(_table, _keymap.axes().values(), _clock.t)
+	params.apply_resolved(values)
+	if _console != null and _console.visible:
+		_console.set_resolved(values)
+
+
+# ------------------------------------------------------------- save / load
+
 func save_view_to(path: String) -> void:
 	var noise: Dictionary = _noise.to_dict() if _noise != null else {}
-	var err := Workspace.save_file(path, params, camera, noise)
+	var err := Workspace.save_file(path, _table, _keymap.axes(), params, camera, noise)
 	if err != OK:
 		_report("Save failed (error %d): %s" % [err, path])
 		return
@@ -156,9 +245,8 @@ func save_view_to(path: String) -> void:
 
 
 func load_view_from(path: String) -> void:
-	# A saved view carries a sensitivity too, but the player's setting wins.
 	_loading = true
-	var result := Workspace.load_file(path, params, camera)
+	var result := Workspace.load_file(path, _table, _keymap.axes(), params, camera)
 	_loading = false
 	params.mouse_sensitivity = Settings.mouse_sensitivity
 	var warnings: Array = result["warnings"]
@@ -166,13 +254,12 @@ func load_view_from(path: String) -> void:
 		_report("Load failed: %s" % warnings[0])
 		return
 	_files.note_loaded(path)
-	# A file with a "noise" section replaces the field; one without leaves it alone.
+	_resolve_once()   # push the loaded table straight into params
 	var noise: Variant = result.get("noise", null)
 	if noise is Dictionary and _noise != null:
 		var noise_warnings := _noise.apply_dict(noise)
 		for w in noise_warnings:
 			warnings.append("noise: %s" % w)
-	# The camera moved after the mode was applied, so re-centre the orbit on it.
 	if _orbit and params.camera_mode == FractalParams.CameraMode.ORBIT:
 		_orbit.enter()
 	if warnings.is_empty():
@@ -181,7 +268,7 @@ func load_view_from(path: String) -> void:
 		_report("Loaded %s with %d warning(s): %s" % [path.get_file(), warnings.size(), "; ".join(warnings)])
 
 
-## Cmd/Ctrl+P: put the fractal (without the panel or other UI) on the clipboard.
+## Cmd/Ctrl+P: put the fractal (without any UI) on the clipboard.
 func copy_screenshot() -> void:
 	var err := ClipboardImage.copy(view.capture())
 	if err == OK:
@@ -190,30 +277,33 @@ func copy_screenshot() -> void:
 		_report("Could not copy screenshot: %s" % error_string(err))
 
 
-## The load shedder's top level caps the Fly speed; the panel shows the level.
+## The load shedder's top level caps the Fly speed; the console's Movement pane
+## shows the level.
 func _on_shed_level_changed(level: int) -> void:
 	fly.speed_limit = LoadShedder.settings(level)["speed"]
-	panel.show_shed_level(level)
+	_console.show_shed_level(level)
 
 
 func _report(line: String) -> void:
 	print(line)
-	panel.show_status(line)
+	if _pause != null:
+		_pause.show_status(line)
 
 
 ## A file panel is opening (possibly from Cmd+S with the mouse captured): free
 ## the mouse so the panel can be used.
 func _on_prompting() -> void:
-	panel.visible = true
+	_free_requested = true
 	_update_mouse()
 
+
+# ------------------------------------------------------------- mouse / mode
 
 func _apply_mode() -> void:
 	var is_fly := params.camera_mode == FractalParams.CameraMode.FLY
 	fly.enabled = is_fly
 	if _orbit:
 		_orbit.enabled = not is_fly
-		# enter() only when the mode actually changed, not on every slider move
 		if not is_fly and params.camera_mode != _last_mode:
 			_orbit.enter()
 	_last_mode = params.camera_mode
@@ -221,39 +311,44 @@ func _apply_mode() -> void:
 
 
 func _update_mouse() -> void:
-	var capture := params.camera_mode == FractalParams.CameraMode.FLY \
-			and not panel.visible and not _pause.visible \
+	_captured = params.camera_mode == FractalParams.CameraMode.FLY \
+			and not _pause.visible and not _free_requested \
 			and not (_noise != null and _noise.visible)
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if capture else Input.MOUSE_MODE_VISIBLE)
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if _captured else Input.MOUSE_MODE_VISIBLE)
+
+
+## Whether the mouse is (meant to be) captured. Headless cannot report CAPTURED
+## through Input.mouse_mode, so Main tracks the intent itself.
+func is_mouse_captured() -> bool:
+	return _captured
+
+
+## A Ctrl tap, from Main's window or the console's. Captured (flying): free the
+## mouse and make sure the console is open. Free: toggle the console, and when
+## that closes it, allow the mouse to recapture.
+func _on_console_toggle() -> void:
+	if _captured:
+		_free_requested = true
+		if not _console.visible:
+			_console.open()
+	else:
+		_console.toggle()
+		if not _console.visible:
+			_free_requested = false
+	_update_mouse()
 
 
 func _active_camera() -> Node:
 	return fly if params.camera_mode == FractalParams.CameraMode.FLY else _orbit
 
 
-# The only mouse dispatcher: Ctrl tap -> Escape/screenshot -> JuliaMarker -> camera.
-# (Paused, this does not run; the PauseMenu takes Escape instead.)
+# The only mouse dispatcher: Ctrl tap -> Escape/screenshot -> noise -> marker -> camera.
 func _unhandled_input(event: InputEvent) -> void:
-	# 1. A Ctrl tap (down then up with no other key between) toggles the panel.
-	# Ctrl is also a chord modifier (Ctrl+S quick-saves, Ctrl+P screenshots), so
-	# we toggle on *release* and only when Ctrl was tapped alone: a bare Ctrl
-	# key-down arms it, any other key-down disarms it. This runs before the
-	# action checks below so a chord's second key (e.g. P) still disarms even
-	# though copy_screenshot consumes it. Ignored while a panel text field has
-	# focus. is_action_pressed can't express "release with no chord", so we read
-	# the Ctrl key event directly; toggle_panel stays defined for the story.
-	if event is InputEventKey and not event.echo:
-		if event.physical_keycode == KEY_CTRL:
-			if event.pressed:
-				_ctrl_armed = not panel.text_field_has_focus()
-			elif _ctrl_armed:
-				_ctrl_armed = false
-				panel.visible = not panel.visible
-				_update_mouse()
-				get_viewport().set_input_as_handled()
-				return
-		elif event.pressed:
-			_ctrl_armed = false   # any other key pressed while Ctrl is held disarms
+	# 1. A Ctrl tap (down then up with no other key between) toggles the console.
+	if _ctrl.feed(event):
+		_on_console_toggle()
+		get_viewport().set_input_as_handled()
+		return
 
 	if event.is_action_pressed("pause"):
 		pause()
@@ -265,17 +360,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	# 1b. N toggles the noise editor (ignored while a panel text field has focus;
-	# the editor's own spin boxes live in its window and consume their own keys).
+	# 1b. N toggles the noise editor (ignored while a text field is focused).
 	if event.is_action_pressed("toggle_noise_editor"):
-		if panel.text_field_has_focus():
+		if TextFocus.any(_focus_viewports()):
 			return
 		_toggle_noise()
 		get_viewport().set_input_as_handled()
 		return
 
 	# 2. Julia marker drag, only while the mouse is free
-	if _marker and params.julia_enabled and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
+	if _marker and params.julia_enabled() and not _captured:
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				if _marker.begin_drag(event.position):
@@ -288,13 +382,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-	# 3. click outside the panel in FLY mode while free: hide panel, recapture.
-	# (The panel consumes clicks inside itself, so a click reaching here is outside.)
+	# 3. click in the view in FLY mode while free: recapture, close the noise
+	# editor, and LEAVE the console open (that is the point of a second window).
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT \
 			and params.camera_mode == FractalParams.CameraMode.FLY \
-			and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
-		panel.visible = false
+			and not _captured:
+		_free_requested = false
 		if _noise != null:
 			_noise.close()
 		_update_mouse()

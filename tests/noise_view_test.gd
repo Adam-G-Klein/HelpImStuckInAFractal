@@ -5,11 +5,17 @@ extends "res://tests/test_case.gd"
 ## losing the working shader.
 
 
-const BASE_UNIFORMS := ["eye", "cam_right", "cam_up", "cam_forward", "tan_half_fov",
-	"aspect", "scale", "min_r2", "fixed_r2", "fold_limit", "precision",
-	"color_mode", "julia_enabled", "julia_point", "box_half",
-	"detail_range", "detail_falloff", "near_dist", "coarse_steps", "fine_steps",
-	"fog_dist", "fog_color"]
+## The renderer's own uniforms plus every shape catalogue id (filled in run()).
+var BASE_UNIFORMS: Array = []
+
+
+func _base_uniforms() -> Array:
+	var out: Array = ["eye", "cam_right", "cam_up", "cam_forward", "tan_half_fov",
+		"aspect", "box_half", "detail_range", "detail_falloff", "near_dist",
+		"coarse_steps", "fine_steps", "fog_dist", "fog_color"]
+	for id in MandelboxShape.catalogue_ids():
+		out.append(String(id))
+	return out
 
 
 func _names(view: FractalView) -> Array:
@@ -20,6 +26,7 @@ func _names(view: FractalView) -> Array:
 
 
 func run() -> void:
+	BASE_UNIFORMS = _base_uniforms()
 	var params := FractalParams.new()
 	var cam := CameraState.make_default()
 	var view: FractalView = load("res://src/fractal/fractal_view.tscn").instantiate()

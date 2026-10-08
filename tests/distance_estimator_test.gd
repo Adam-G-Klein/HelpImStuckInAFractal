@@ -1,8 +1,10 @@
 extends "res://tests/test_case.gd"
-## Pins the CPU estimator to the site's own numbers (24 fixtures), plus symmetry
-## and Julia-sensitivity. The fixtures pin the 64-bit scalar core `estimate_at`
-## (passing coordinates as `float`, not a 32-bit `Vector3`), so every row holds
-## the spec's tolerance: relative 1e-5, or absolute 1e-9 below 1e-6.
+## Pins the CPU estimator to the site's own numbers (24 fixtures), plus the
+## spec's non-default fixtures (positive scale, Sphere -> Box, one iteration
+## rotation, a non-zero w, a per-component Julia mix) and the symmetry /
+## sensitivity invariants. The fixtures pin the 64-bit scalar core
+## `estimate_at`, so every row holds the spec's tolerance: relative 1e-5, or
+## absolute 1e-9 below 1e-6.
 
 
 func _de(px: float, py: float, pz: float, params: FractalParams, expected: float, label: String) -> void:
@@ -13,7 +15,7 @@ func _de(px: float, py: float, pz: float, params: FractalParams, expected: float
 
 
 func run() -> void:
-	# --- defaults: scale -2.09, inner 0.7, fold 1, outer 1, no Julia ---
+	# --- defaults: box_scale -2.09, min 0.7, fold 1, fixed 1, no Julia, w 0 ---
 	var d := FractalParams.new()
 	_de(0, 0, 0, d, 0.0, "def (0,0,0)")
 	_de(0.5, 0.5, 0.5, d, 1.67e-15, "def (0.5,0.5,0.5)")
@@ -24,9 +26,9 @@ func run() -> void:
 	_de(0.1, 0.9, 1.5, d, 1.2707534e-5, "def (0.1,0.9,1.5)")
 	_de(-1.5, 1.5, -1.5, d, 7.2696999e-3, "def (-1.5,1.5,-1.5)")
 
-	# --- alternative shape: scale -3, inner 0.5, fold 0.8, outer 0.9 ---
+	# --- alternative shape: box_scale -3, min 0.5, fold 0.8, fixed 0.9 ---
 	var a := FractalParams.new()
-	a.scale = -3.0; a.inner_radius = 0.5; a.fold_limit = 0.8; a.outer_radius = 0.9
+	a.box_scale = -3.0; a.min_radius = 0.5; a.fold_limit = 0.8; a.fixed_radius = 0.9
 	_de(0, 0, 0, a, 0.0, "alt (0,0,0)")
 	_de(0.5, 0.5, 0.5, a, 3.9589733e-3, "alt (0.5,0.5,0.5)")
 	_de(1.2, -0.3, 0.8, a, 7.3684211e-2, "alt (1.2,-0.3,0.8)")
@@ -36,9 +38,9 @@ func run() -> void:
 	_de(0.1, 0.9, 1.5, a, 1.2998357e-2, "alt (0.1,0.9,1.5)")
 	_de(-1.5, 1.5, -1.5, a, 3.5649260e-3, "alt (-1.5,1.5,-1.5)")
 
-	# --- defaults with Julia on at (-0.23, 1.512, 1.892) ---
+	# --- defaults with Julia (all) on, constant (-0.23, 1.512, 1.892, 0) ---
 	var j := FractalParams.new()
-	j.julia_enabled = true
+	j.julia_all = true
 	_de(0, 0, 0, j, 4.9979908e-3, "jul (0,0,0)")
 	_de(0.5, 0.5, 0.5, j, 1.0887837e-2, "jul (0.5,0.5,0.5)")
 	_de(1.2, -0.3, 0.8, j, 4.5308936e-3, "jul (1.2,-0.3,0.8)")
@@ -48,13 +50,13 @@ func run() -> void:
 	_de(0.1, 0.9, 1.5, j, 3.6647735e-3, "jul (0.1,0.9,1.5)")
 	_de(-1.5, 1.5, -1.5, j, 0.25217396, "jul (-1.5,1.5,-1.5)")
 
-	# --- symmetry: D(p) == D(-p) in non-Julia mode ---
+	# --- symmetry: D(p) == D(-p) in non-Julia mode, w 0 ---
 	for p in [Vector3(0.7, 0.3, 0.9), Vector3(1.2, -0.3, 0.8), Vector3(3, 0, 0),
 			Vector3(8.18, 3.81, 3.28)]:
 		check_approx(DistanceEstimator.estimate(p, d), DistanceEstimator.estimate(-p, d),
 			"D(p) == D(-p) at %s" % p, 1e-9)
 
-	# --- the Julia point changes the result ---
+	# --- the Julia (all) constant changes the result ---
 	check(absf(DistanceEstimator.estimate(Vector3(3, 0, 0), d)
 			- DistanceEstimator.estimate(Vector3(3, 0, 0), j)) > 0.5,
 		"turning Julia on changes the distance")
@@ -62,3 +64,40 @@ func run() -> void:
 	# --- the public Vector3 API delegates to the core ---
 	check_approx(DistanceEstimator.estimate(Vector3(3, 0, 0), d),
 		DistanceEstimator.estimate_at(3.0, 0.0, 0.0, d), "estimate() == estimate_at()", 1e-6)
+
+	# ============================= new fixtures =============================
+	# These pin the non-default knobs. Each value was captured from estimate_at
+	# once; the shape of the mb_step is cross-checked against the shader by
+	# shader_test (same uniforms) and by the structural invariants below.
+
+	# positive scale (box_scale 2)
+	var ps := FractalParams.new(); ps.box_scale = 2.0
+	_de(1.2, -0.3, 0.8, ps, 2.5e-13, "pos scale (1.2,-0.3,0.8)")
+	_de(0.5, 0.5, 0.5, ps, 1.0e-14, "pos scale (0.5,0.5,0.5)")
+	# Sphere -> Box
+	var sb := FractalParams.new(); sb.fold_order = 1
+	_de(1.2, -0.3, 0.8, sb, 1.280467e-8, "sphere->box (1.2,-0.3,0.8)")
+	# one iteration rotation (xy 30 deg)
+	var rot := FractalParams.new(); rot.iter_rot_xy = 30.0
+	_de(1.2, -0.3, 0.8, rot, 2.062593788e-4, "iter rot xy 30 (1.2,-0.3,0.8)")
+	# a non-zero w
+	var wp := FractalParams.new(); wp.w = 0.5
+	_de(1.2, -0.3, 0.8, wp, 6.280428097e-5, "w=0.5 (1.2,-0.3,0.8)")
+	# a per-component Julia mix (x and z constant, y and w from the point)
+	var mix := FractalParams.new(); mix.julia_0 = true; mix.julia_2 = true
+	_de(1.2, -0.3, 0.8, mix, 2.02335288439e-3, "julia mix 0,2 (1.2,-0.3,0.8)")
+
+	# --- structural invariants: each non-default knob changes the picture ---
+	var base := DistanceEstimator.estimate(Vector3(1.2, -0.3, 0.8), d)
+	check(absf(DistanceEstimator.estimate(Vector3(1.2, -0.3, 0.8), sb) - base) > 1e-6,
+		"fold order changes the distance")
+	check(absf(DistanceEstimator.estimate(Vector3(1.2, -0.3, 0.8), wp) - base) > 1e-6,
+		"a non-zero w changes the distance")
+	check(absf(DistanceEstimator.estimate(Vector3(1.2, -0.3, 0.8), ps) - base) > 1e-6,
+		"a positive scale changes the distance")
+	# an iteration rotation changes the distance (vs no rotation)
+	check(absf(DistanceEstimator.estimate(Vector3(1.2, -0.3, 0.8), rot) - base) > 1e-6,
+		"an iteration rotation changes the distance")
+	# a per-component Julia mix changes the distance
+	check(absf(DistanceEstimator.estimate(Vector3(1.2, -0.3, 0.8), mix) - base) > 1e-6,
+		"a per-component Julia mix changes the distance")

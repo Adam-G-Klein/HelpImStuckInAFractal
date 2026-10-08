@@ -15,11 +15,19 @@ var speed_limit := 1.0
 
 var _params: FractalParams
 var _camera: CameraState
+## Viewports whose text focus silences WASD, so typing in the console or a
+## panel never flies the camera. Set by Main; empty for a standalone camera.
+var _text_viewports: Array = []
 
 
 func setup(params: FractalParams, camera: CameraState) -> void:
 	_params = params
 	_camera = camera
+
+
+## The viewports (main window + console) whose text focus silences movement.
+func set_text_viewports(viewports: Array) -> void:
+	_text_viewports = viewports
 
 
 ## Mouse dispatch is owned by Main, which calls this for the active camera.
@@ -78,6 +86,8 @@ func apply_look(dx: float, dy: float) -> void:
 ## and S alone is move_back.
 func move_direction() -> Vector3:
 	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL):
+		return Vector3.ZERO
+	if TextFocus.any(_text_viewports):
 		return Vector3.ZERO
 	var f := Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
 	var s := Input.get_action_strength("move_right") - Input.get_action_strength("move_left")

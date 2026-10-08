@@ -5,8 +5,10 @@ A from-scratch Godot 4.6 Mandelbox viewer that emulates the renderer at
 view, the four shape sliders, the thirteen colour modes, the precision control,
 Julia mode and an orbit camera. On top of the site it adds a distance-scaled
 free-fly camera, an adaptive-resolution governor that keeps the frame rate up
-while you move, and a runtime controls panel. It is built on the **GL
-Compatibility** renderer (WebGL 2) so it is web-exportable.
+while you move, and a second **console** window — a Shape inspector of every
+Mandelbox knob with Fractacular's binding model, and a Movement pane of virtual
+axes driven by key pairs. It is built on the **GL Compatibility** renderer
+(WebGL 2) so it is web-exportable.
 
 GDScript only — no C#, even though the Godot build on disk is the Mono build.
 
@@ -25,9 +27,13 @@ binary.
 
 ## Controls
 
-Tap **Ctrl** to open the controls panel. Everything the panel does not own is
-driven directly by the mouse and keyboard. Press **Escape** to pause: the pause
-menu offers Resume, Settings and Back to Menu, and Escape again steps back out.
+Tap **Ctrl** to open the **console** (a second, native window — drag it to
+another monitor). It splits into the **Shape** inspector, with a row for every
+Mandelbox knob, and the **Movement** pane of virtual axes. Everything the
+console does not own is driven directly by the mouse and keyboard. Press
+**Escape** to pause: the pause menu offers Save view / Load view, the Camera
+mode, Fast Controls, a Noise editor button, and Resume / Settings / Back to
+Menu; Escape again steps back out.
 
 **Settings** (from the title menu or the pause menu) has two tabs.
 
@@ -70,14 +76,15 @@ colour mode on the way there. The thresholds are sticky: a shed needs 0.5 s
 under 24 fps (and 1 s since the last change), a restore needs 2 s over 40 fps,
 nothing changes in between, and a shed soon after a restore doubles the next
 restore's wait (up to 16 s). The level is kept while you are still, but the
-still frame always renders at full quality. The Q panel shows `load shed N/4`
-while a level is active.
+still frame always renders at full quality. The console's Movement pane shows
+`load shed N/4` while a level is active.
 
 ### Fly camera (default)
 
 | key / action | what it does |
 |---|---|
-| **Ctrl** (tap) | toggle the controls panel (also releases/recaptures the mouse); fires on release, so Ctrl+S and Ctrl+P still work |
+| **Ctrl** (tap) | open the console and free the mouse; tap again to close it and recapture. Fires on release, so Ctrl+S and Ctrl+P still work |
+| **Q / E** | the default virtual **Axis A** (negative / positive). Bind a Shape row to Axis A to give Q and E that knob |
 | **N** | toggle the noise-field editor (also releases/recaptures the mouse) |
 | **Escape** | pause menu (releases the mouse; resuming recaptures it) |
 | **W / A / S / D** | move forward / left / back / right |
@@ -85,7 +92,7 @@ while a level is active.
 | **Shift** (hold) | sprint — multiply the travel speed by 4 while held |
 | mouse move | mouse-look while captured (yaw about world +Z, pitch about the camera's right; no roll) |
 | mouse wheel | adjust the speed factor (×1.25 per tick up, ÷1.25 down; clamped 0.01–100) |
-| click | with the mouse free, click the view to hide the panel and recapture the mouse |
+| click | with the mouse free, click the view to recapture the mouse (and close the noise editor); the console stays open — that is the point of a second window |
 
 Movement speed scales with the distance to the nearest surface — roughly one
 second covers the gap to whatever you are looking at — so flight stays usable
@@ -93,7 +100,7 @@ from far away and slows down automatically as you approach the fractal.
 
 ### Orbit camera
 
-Switch to **Orbit** from the panel's Camera dropdown. The mouse is never
+Switch to **Orbit** from the pause menu's Camera option. The mouse is never
 captured in this mode.
 
 | action | what it does |
@@ -104,50 +111,102 @@ captured in this mode.
 | mouse wheel | zoom toward the point under the cursor |
 | click (no drag) | re-centre on the surface under the cursor (or the origin if nothing is hit nearby) |
 
-### Controls panel (Ctrl)
+### Console (Ctrl)
 
-| row | controls |
-|---|---|
-| **Save** / **Load** | pick a file in a native panel; saves live in `saves/`, tracked by git (shape, colour, precision, renderer options, Julia, camera). The current file's name sits to the right |
-| **Slice (Scale)** | the Mandelbox scale |
-| **Inner Radius** / **Fold** / **Outer Radius** | the three remaining shape parameters |
-| **Color** | one of the thirteen colour modes (Grayscale, Ice Fractal, Borg, Rainbow, Rainbow 2, Rainbow 3, Rainbow Metal, Blue, Blue 2, Pink-Blue, Ice Box, Ice Box 2, Gold) |
-| **Precision** | ray-march precision (smaller = sharper, slower) |
-| **Julia** | toggle Julia mode; the X/Y/Z fields set the Julia point, which also has a draggable on-screen marker |
-| **Fast Controls** | let the resolution governor drop render scale, then shed quality (see Load shedding), while you interact |
-| **Camera** | Fly or Orbit |
-| **Mouse sensitivity** | look / orbit speed (the same setting as in Settings) |
+A Ctrl tap opens the console, a native second window split **Shape | Movement**.
 
-**⌘S** (Ctrl+S elsewhere) saves over the current file without a panel; with
-no current file it opens the Save panel. The line under the buttons reports
-each save and load, including any values a file had that this build skipped.
+**Shape pane.** One row per Mandelbox knob, grouped **Box** / **Julia** /
+**Iteration rotation** / **Render**:
 
-**⌘P** (Ctrl+P elsewhere) copies a screenshot of the fractal, without the panel
-or other UI, to the clipboard as a PNG. On Linux this needs `xclip`.
+- **Box** — Scale, Fold limit, Min radius, Fixed radius, Fold order (Box→Sphere
+  or Sphere→Box) and **W**, the fourth coordinate of the 4D sample point (0 is
+  today's 3D box).
+- **Julia** — a master **Julia (all)** toggle and four per-component toggles,
+  each revealing its **Constant** (the rows collapse until Julia is on). While
+  Julia is on, a white ring marks the point in the view; drag it (with the mouse
+  free) to move Constants x/y/z, which survives the next resolve.
+- **Iteration rotation** — the six 4D plane angles applied inside every
+  iteration (they change the fractal itself, not just the view).
+- **Render** — the thirteen Colour modes and the ray-march Precision (log slider).
 
-While Julia mode is on, a white ring marks the Julia point in the view; drag it
-(with the mouse free) to move the point in the plane facing the camera.
+Each bindable row carries Fractacular's binding widgets: a **Source** (None,
+Time, or a virtual axis), a **Gain**, a **Waveform** (Linear / Sine / Triangle)
+and a **Period**. The value in use each frame is `default + gain ×
+waveform(source)`, shown as a live readout while a binding is active.
+
+**Movement pane.** One line per virtual axis — an editable label, its id, the
+live value, a **0** button, the push **speed**, two key-capture buttons (click,
+then press a key) and a remove button — plus **Add axis**, the clock readout,
+the fly camera's speed factor, and **Save** / **Save as…** / **Load…** for the
+keymap file. Key pairs push an axis at its speed; a Shape row bound to that axis
+reads the value, so the row's gain is the key's sensitivity.
+
+**⌘S** (Ctrl+S elsewhere) saves the view over the current file without a panel;
+with no current file it opens the Save panel.
+
+**⌘P** (Ctrl+P elsewhere) copies a screenshot of the fractal, without any UI, to
+the clipboard as a PNG. On Linux this needs `xclip`.
+
+### Pause menu (Escape)
+
+Escape pauses and opens the menu, which holds what the old Q panel kept that is
+not a shape knob: a **Save view…** / **Load view…** row with the current file's
+name and a status line, the **Camera** mode (Fly / Orbit), the **Fast Controls**
+toggle (let the resolution governor drop render scale while you interact), a
+**Noise editor…** button, and Resume / **Settings** / Back to Menu. Settings
+holds the mouse sensitivity.
+
+## Keymap
+
+The virtual axes and their key pairs live in **`saves/keymap.json`**, separate
+from any view (a level loads a view and a keymap independently, and the same
+view can play under different keys):
+
+```json
+{
+  "version": 1,
+  "axes": [
+    {"id": "a", "label": "Axis A", "speed": 1.0, "positive": "E", "negative": "Q"}
+  ]
+}
+```
+
+Keys are stored by name (layout-independent), `""` meaning unbound. The shipped
+default is one Axis A on Q/E at one unit per second. Each axis registers two
+input actions, `axis_<id>_pos` and `axis_<id>_neg`. The Movement pane's Save /
+Load edit this file; a missing or malformed file falls back to the default.
 
 ## Saved views
 
-A save is a small JSON file: a `fractal` section with every panel value
-(colour mode by the site's id, camera mode as `"fly"`/`"orbit"`, the Julia
-point as `[x, y, z]`) and a `camera` section with the eye, forward and up
-vectors and the speed factor. Loading skips anything it does not recognise or
-cannot read, with a warning, and leaves values a file does not mention as they
-are. An exported build cannot write into the project, so it saves to
-`user://saves/` instead.
+A save is a small JSON file, **version 2**:
+
+- **`shape`** — `AttributeTable.to_dict()`: a `defaults` map (every catalogue id
+  to its value) and a `bindings` map (only active bindings, each a source /
+  gain / waveform / period).
+- **`axes`** — every virtual axis value by id.
+- **`fractal`** — the non-shape preferences: `fast_controls`, `camera_mode`
+  (`"fly"`/`"orbit"`) and `mouse_sensitivity`.
+- **`camera`** — the eye, forward and up vectors and the speed factor.
+- **`noise`** — the noise graph, when one is wired (additive; see below).
+
+Loading skips anything it does not recognise or cannot read, with a warning, and
+leaves values a file does not mention as they are. A **version-1** file (the old
+flat `fractal` section) still loads: its keys are mapped (`scale`→`box_scale`,
+`inner_radius`→`min_radius`, `outer_radius`→`fixed_radius`,
+`julia_enabled`→`julia_all`, `julia_point`→the three Constants) without a
+warning. Saving always writes version 2. An exported build cannot write into the
+project, so it saves to `user://saves/` instead.
 
 | file | what it is |
 |---|---|
 | `saves/default.json` | the opening view |
-| `saves/juliaIceField.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Slice −2.29, Inner 0, Fold 0.72, Outer 0.29, Ice Fractal, precision 0.00002 |
-| `saves/juliaIceTerraces.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Slice −1.88, Inner 0.49, Fold 0.81, Outer 0.53, Ice Fractal, precision 0.0001 |
+| `saves/juliaIceField.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Scale −2.29, Min 0, Fold 0.72, Fixed 0.29, Ice Fractal, precision 0.00002 |
+| `saves/juliaIceTerraces.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Scale −1.88, Min 0.49, Fold 0.81, Fixed 0.53, Ice Fractal, precision 0.0001 |
 | `saves/noiseRidges.json` | the default Ice Fractal view with a noise field wired: value-noise ridges displacing the surface and tinting it blue (see **Noise fields**) |
 
 ## Noise fields
 
-Press **N** (or the **Noise editor…** button in the controls panel) to open the
+Press **N** (or the **Noise editor…** button in the pause menu) to open the
 noise-field editor: an in-app node graph, ported from Fractacular's Isolation
 window, that builds a 3D scalar field and overlays it on the Mandelbox. Wiring it
 to the **Output** node does two things to the picture, live as you edit:
@@ -159,7 +218,7 @@ to the **Output** node does two things to the picture, live as you edit:
 - **Tint** — the surface colour is blended toward the Output's **Tint colour** by
   the field, scaled by **Tint strength**.
 
-Opening the editor frees the mouse the way the controls panel does; a click in the view
+Opening the editor frees the mouse; a click in the view
 in Fly mode closes it and recaptures. **Orbit** mode (Camera dropdown) is the
 comfortable way to author, since the mouse is never captured. Each node with an
 output carries a live preview — a flat slice of the field — and the toolbar's
@@ -213,8 +272,10 @@ tests/screenshots.sh  # windowed render check (writes PNGs to screenshots/)
 each `tests/*_test.gd` headlessly; it exits non-zero if any test fails. Because
 the headless renderer produces no pixels, the actual render is verified by
 `tests/screenshots.sh`, which launches Godot windowed **without stealing focus**
-(via `open -g`), renders the default view and each colour mode, and writes the
-results plus a `PASS`/`FAIL` log to `tests/out/screenshots.txt`.
+(via `open -g`), renders the default view, each colour mode, and a
+`console_bound_axis` frame (Axis A bound to the scale, required to differ from
+the default), and writes the results plus a `PASS`/`FAIL` log to
+`tests/out/screenshots.txt`.
 
 The reference capture from the site lives at
 **`docs/reference/icefractal-default.jpg`**. Put `screenshots/default_view.png`
