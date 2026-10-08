@@ -51,6 +51,28 @@ A ray stops once the distance estimate falls below
 `precision / detail × t × max(1, t / (range × d₀))^falloff`, where `t` is the
 distance along the ray and `d₀` the camera's distance to the nearest surface.
 
+### Load shedding
+
+With Fast Controls on, the render scale is the first thing to give while you
+move. Once it is at **Min resolution** and the frame rate is still under 24 fps,
+the governor sheds quality a level at a time:
+
+| level | distance fog (× d₀) | detail | step budget | Fly speed |
+|---|---|---|---|---|
+| 0 | none | 100% | 100% | — |
+| 1 | 400 | 75% | 100% | — |
+| 2 | 150 | 55% | 75% | — |
+| 3 | 60 | 40% | 50% | — |
+| 4 | 40 | 35% | 50% | capped at 40% |
+
+Rays stop at the fog distance, and the view fades into a tint of the current
+colour mode on the way there. The thresholds are sticky: a shed needs 0.5 s
+under 24 fps (and 1 s since the last change), a restore needs 2 s over 40 fps,
+nothing changes in between, and a shed soon after a restore doubles the next
+restore's wait (up to 16 s). The level is kept while you are still, but the
+still frame always renders at full quality. The Q panel shows `load shed N/4`
+while a level is active.
+
 ### Fly camera (default)
 
 | key / action | what it does |
@@ -91,7 +113,7 @@ captured in this mode.
 | **Color** | one of the thirteen colour modes (Grayscale, Ice Fractal, Borg, Rainbow, Rainbow 2, Rainbow 3, Rainbow Metal, Blue, Blue 2, Pink-Blue, Ice Box, Ice Box 2, Gold) |
 | **Precision** | ray-march precision (smaller = sharper, slower) |
 | **Julia** | toggle Julia mode; the X/Y/Z fields set the Julia point, which also has a draggable on-screen marker |
-| **Fast Controls** | let the resolution governor drop render scale while you interact |
+| **Fast Controls** | let the resolution governor drop render scale, then shed quality (see Load shedding), while you interact |
 | **Camera** | Fly or Orbit |
 | **Mouse sensitivity** | look / orbit speed (the same setting as in Settings) |
 

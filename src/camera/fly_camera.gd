@@ -8,6 +8,8 @@ const WORLD_UP := Vector3(0, 0, 1)
 const MAX_FORWARD_Z := 0.9998476951563913   # sin(89 deg): keep forward 1 deg off +/-Z
 
 var enabled := false
+## The load shedder's cap on travel speed: 1.0 normally, lower at its top level.
+var speed_limit := 1.0
 
 var _params: FractalParams
 var _camera: CameraState
@@ -25,6 +27,8 @@ func handle_event(event: InputEvent) -> bool:
 	if not enabled:
 		return false
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		# macOS sends zero-delta motion while a captured mouse rests; apply_look
+		# ignores it, so a still view stays still.
 		apply_look(event.relative.x, event.relative.y)
 		return true
 	if event is InputEventMouseButton and event.pressed:
@@ -53,6 +57,8 @@ func _physics_process(delta: float) -> void:
 ## the forward vector never reaches +/-Z. Clamping the ANGLE (not forward.z after
 ## an arbitrary rotation) means even a huge delta saturates instead of wrapping.
 func apply_look(dx: float, dy: float) -> void:
+	if dx == 0.0 and dy == 0.0:
+		return   # rebuilding the basis would round off, and a round-off is a change
 	var sens := _params.mouse_sensitivity
 	var fwd := _camera.forward().rotated(WORLD_UP, deg_to_rad(-dx * sens))  # yaw keeps pitch
 	var max_pitch := asin(MAX_FORWARD_Z)
@@ -79,10 +85,11 @@ func move_direction() -> Vector3:
 	return dir
 
 
-## Travel speed: ~one second covers the distance to the nearest surface.
+## Travel speed: ~one second covers the distance to the nearest surface, times
+## the load shedder's speed_limit.
 func current_speed() -> float:
 	var d := DistanceEstimator.estimate(_camera.eye(), _params)
-	return clampf(d, 1e-6, 20.0) * _camera.speed_factor
+	return clampf(d, 1e-6, 20.0) * _camera.speed_factor * speed_limit
 
 
 func scroll(up: bool) -> void:

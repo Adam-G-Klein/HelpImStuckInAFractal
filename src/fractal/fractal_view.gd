@@ -12,6 +12,8 @@ signal noise_status(text: String)
 
 var render_scale := 1.0
 var continuous := false
+## The governor's load-shed level (0 = full quality); see set_load_level().
+var load_level := 0
 
 var _params: FractalParams
 var _camera: CameraState
@@ -27,6 +29,7 @@ var _pending_size := Vector2i(1280, 800)
 var _base_shader: Shader
 var _base_code := ""
 var _noise_graph: NoiseGraph
+var _shed: Dictionary = LoadShedder.settings(0)
 
 
 func _ready() -> void:
@@ -183,6 +186,17 @@ func set_render_scale(s: float) -> void:
 	_apply_size()
 
 
+## Render at a LoadShedder level: its fog, and its detail and step-budget
+## factors on top of the view's own. Level 0 is exactly the view's settings.
+func set_load_level(level: int) -> void:
+	level = clampi(level, 0, LoadShedder.top())
+	if level == load_level:
+		return
+	load_level = level
+	_shed = LoadShedder.settings(level)
+	_push_params()
+
+
 func request_frame() -> void:
 	if _viewport == null:
 		return  # setup() may run before _ready wires the SubViewport
@@ -258,7 +272,7 @@ func _push_params() -> void:
 	_material.set_shader_parameter("min_r2", _params.inner_radius * _params.inner_radius)
 	_material.set_shader_parameter("fixed_r2", _params.outer_radius * _params.outer_radius)
 	_material.set_shader_parameter("fold_limit", _params.fold_limit)
-	_material.set_shader_parameter("precision", _params.precision / _params.detail)
+	_material.set_shader_parameter("precision", _params.precision / (_params.detail * _shed["detail"]))
 	_material.set_shader_parameter("color_mode", _params.color_mode)
 	_material.set_shader_parameter("julia_enabled", _params.julia_enabled)
 	_material.set_shader_parameter("julia_point", _params.julia_point)
@@ -266,8 +280,11 @@ func _push_params() -> void:
 	_material.set_shader_parameter("box_half", 20.0 if _params.julia_enabled else 2.0)
 	_material.set_shader_parameter("detail_range", _params.detail_range)
 	_material.set_shader_parameter("detail_falloff", _params.detail_falloff)
-	_material.set_shader_parameter("coarse_steps", _params.coarse_steps())
-	_material.set_shader_parameter("fine_steps", _params.fine_steps())
+	var budget := maxi(FractalParams.MAX_STEPS_MIN, int(round(_params.max_steps * _shed["steps"])))
+	_material.set_shader_parameter("coarse_steps", _params.coarse_steps(budget))
+	_material.set_shader_parameter("fine_steps", _params.fine_steps(budget))
+	_material.set_shader_parameter("fog_dist", _shed["fog"])
+	_material.set_shader_parameter("fog_color", _params.fog_color())
 	_push_near()
 
 

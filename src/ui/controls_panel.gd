@@ -18,6 +18,7 @@ var fast_check: CheckBox
 var camera_option: OptionButton
 var sens_slider: HSlider
 var speed_label: Label
+var shed_label: Label
 var legend_label: Label
 var save_button: Button
 var load_button: Button
@@ -101,6 +102,11 @@ func _build() -> void:
 
 	speed_label = Label.new()
 	box.add_child(speed_label)
+	shed_label = Label.new()
+	shed_label.tooltip_text = "Holding the frame rate by trading quality: distance fog and coarser detail first, a lower Fly speed cap only at the top level. Follows Fast Controls."
+	shed_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	shed_label.visible = false
+	box.add_child(shed_label)
 	legend_label = Label.new()
 	legend_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	box.add_child(legend_label)
@@ -140,6 +146,12 @@ func show_file(display_name: String) -> void:
 func show_status(text: String) -> void:
 	status_label.text = text
 	status_label.visible = text != ""
+
+
+## The governor's load-shed level; shown only while it is above 0.
+func show_shed_level(level: int) -> void:
+	shed_label.text = "load shed %d/%d" % [level, LoadShedder.top()]
+	shed_label.visible = level > 0
 
 
 ## True while any text field in the panel holds keyboard focus (so Main can

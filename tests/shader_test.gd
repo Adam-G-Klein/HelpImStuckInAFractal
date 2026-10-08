@@ -13,7 +13,8 @@ func run() -> void:
 	var expected := ["eye", "cam_right", "cam_up", "cam_forward", "tan_half_fov",
 		"aspect", "scale", "min_r2", "fixed_r2", "fold_limit", "precision",
 		"color_mode", "julia_enabled", "julia_point", "box_half",
-		"detail_range", "detail_falloff", "near_dist", "coarse_steps", "fine_steps"]
+		"detail_range", "detail_falloff", "near_dist", "coarse_steps", "fine_steps",
+		"fog_dist", "fog_color"]
 	check_eq(names.size(), expected.size(), "exactly %d uniforms" % expected.size())
 	for u in expected:
 		check(names.has(u), "uniform '%s' is declared" % u)

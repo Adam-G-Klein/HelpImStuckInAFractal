@@ -32,6 +32,7 @@ func _ready() -> void:
 	view.setup(params, camera)
 	panel.setup(params, camera)
 	governor.setup(params, view)
+	governor.shed_level_changed.connect(_on_shed_level_changed)
 	fly.setup(params, camera)
 
 	_orbit = get_node_or_null("OrbitCamera")
@@ -182,6 +183,12 @@ func copy_screenshot() -> void:
 		_report("Screenshot copied to clipboard")
 	else:
 		_report("Could not copy screenshot: %s" % error_string(err))
+
+
+## The load shedder's top level caps the Fly speed; the panel shows the level.
+func _on_shed_level_changed(level: int) -> void:
+	fly.speed_limit = LoadShedder.settings(level)["speed"]
+	panel.show_shed_level(level)
 
 
 func _report(line: String) -> void:

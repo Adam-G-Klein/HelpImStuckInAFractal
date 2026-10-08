@@ -42,5 +42,32 @@ func run() -> void:
 	await frames(1)
 	check_eq(view.viewport_size(), Vector2i(1280, 800), "render_scale clamps to 1.0")
 
+	# the load-shed level pushes fog, cheaper detail and a smaller step budget;
+	# level 0 pushes exactly the view's own values
+	var mat := view._material
+	check_eq(view.load_level, 0, "the view starts at full quality")
+	check_eq(float(mat.get_shader_parameter("fog_dist")), 0.0, "no fog at level 0")
+	var base_prec: float = mat.get_shader_parameter("precision")
+	var base_coarse: int = mat.get_shader_parameter("coarse_steps")
+	view.set_load_level(3)
+	var l3 := LoadShedder.settings(3)
+	check_approx(mat.get_shader_parameter("fog_dist"), l3["fog"], "level 3 pushes its fog distance")
+	check_approx(mat.get_shader_parameter("precision"), base_prec / l3["detail"],
+		"level 3 coarsens the precision by its detail factor", 1e-12)
+	check(int(mat.get_shader_parameter("coarse_steps")) < base_coarse, "level 3 shrinks the step budget")
+	check(Vector3(mat.get_shader_parameter("fog_color")).is_equal_approx(params.fog_color()),
+		"the fog takes the colour mode's tint")
+	params.color_mode = 14
+	check(Vector3(mat.get_shader_parameter("fog_color")).is_equal_approx(params.fog_color()),
+		"and follows the colour mode")
+	params.max_steps = FractalParams.MAX_STEPS_MIN
+	check_eq(int(mat.get_shader_parameter("coarse_steps")) + int(mat.get_shader_parameter("fine_steps")),
+		FractalParams.MAX_STEPS_MIN, "the shed budget never drops below MAX_STEPS_MIN")
+	params.max_steps = 128
+	view.set_load_level(0)
+	check_eq(float(mat.get_shader_parameter("fog_dist")), 0.0, "back to level 0: no fog")
+	check_approx(mat.get_shader_parameter("precision"), base_prec, "and the original precision", 1e-12)
+	check_eq(int(mat.get_shader_parameter("coarse_steps")), base_coarse, "and the original budget")
+
 	view.queue_free()
 	await frames(1)

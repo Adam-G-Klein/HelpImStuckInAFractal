@@ -24,6 +24,10 @@ uniform float detail_falloff;
 uniform float near_dist;
 uniform int coarse_steps;
 uniform int fine_steps;
+// The load shedder's distance fog: rays stop at fog_dist x near_dist and fade
+// into fog_color on the way there. fog_dist 0 is no fog.
+uniform float fog_dist;
+uniform vec3 fog_color;
 
 // NOISE:BEGIN
 float noise_displace(vec3 p) { return 0.0; }
@@ -42,6 +46,13 @@ float hit_eps(float t) {
 		e *= pow(t / start, detail_falloff);
 	}
 	return e;
+}
+
+// How far into the fog a point at ray distance t is: 0 clear, 1 fully fogged.
+float fog_amount(float t) {
+	if (fog_dist <= 0.0) { return 0.0; }
+	float t_fog = fog_dist * near_dist;
+	return smoothstep(0.35 * t_fog, t_fog, t);
 }
 
 // Mandelbox distance estimate, up to `iters` iterations (<= 32).
@@ -145,19 +156,25 @@ void fragment() {
 		+ ndc.y * tan_half_fov * cam_up);
 
 	vec3 bg = (color_mode == 5 || color_mode == 6) ? vec3(1.0) : vec3(0.0);
+	// A miss is infinitely far, so under fog the sky is the fog: far surfaces fade
+	// into it without a seam.
+	if (fog_dist > 0.0) { bg = fog_color; }
 
 	vec2 tb = box_intersect(eye, dir, box_half);
 	if (tb.y < max(tb.x, 0.0)) {
 		COLOR = vec4(bg, 1.0);
 	} else {
 		float t_exit = tb.y;
+		if (fog_dist > 0.0) {
+			t_exit = min(t_exit, fog_dist * near_dist);  // nothing past the fog is marched
+		}
 		float total = max(tb.x, 0.0);
-		bool left_cube = false;
+		bool left_cube = total > t_exit;
 
 		// Phase 1: low precision (N=16), up to coarse_steps (<= 384) steps.
 		int n1 = coarse_steps;
 		for (int i = 0; i < 384; i++) {
-			if (i >= coarse_steps) { break; }
+			if (left_cube || i >= coarse_steps) { break; }
 			vec3 pos = eye + dir * total;
 			float d = de(pos, 16);
 			if (d < hit_eps(total) * 2.0) { n1 = i; break; }
@@ -180,14 +197,14 @@ void fragment() {
 		}
 
 		if (left_cube) {
-			COLOR = vec4(bg, 1.0);  // the only miss is leaving the cube
+			COLOR = vec4(bg, 1.0);  // the only misses: leaving the cube, or reaching the fog
 		} else {
 			// Step-count shading stays on the original 128-step scale whatever the
 			// budget, so a ray that hits looks the same; one that ran out is 1.
 			float ce = n2 == fine_steps ? 1.0 : min(float(n1 + n2) / 128.0, 1.0);
 			float inv = 1.0 - ce;
 			if (color_mode == 0) {
-				COLOR = vec4(vec3(inv), 1.0);  // Grayscale needs no normal: stay cheap
+				COLOR = vec4(mix(vec3(inv), fog_color, fog_amount(total)), 1.0);  // Grayscale needs no normal: stay cheap
 			} else {
 				vec3 v = eye + dir * total;
 			vec3 h = v * 0.5;
@@ -246,7 +263,7 @@ void fragment() {
 			} else {
 				col = vec3(inv);
 			}
-				COLOR = vec4(noise_tint(col, v), 1.0);
+				COLOR = vec4(mix(noise_tint(col, v), fog_color, fog_amount(total)), 1.0);
 			}
 		}
 	}

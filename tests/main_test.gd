@@ -197,6 +197,17 @@ func run() -> void:
 	pause.resume_button.pressed.emit()
 	check(not paused and not pause.visible, "so does Resume")
 
+	# the load shedder's top level caps the Fly speed and shows in the panel
+	var top := LoadShedder.top()
+	main.governor.shed_level_changed.emit(top)
+	check_approx(main.fly.speed_limit, LoadShedder.settings(top)["speed"], "the top shed level caps Fly speed")
+	check(main.panel.shed_label.visible and main.panel.shed_label.text == "load shed %d/%d" % [top, top],
+		"the panel shows the shed level")
+	main.governor.shed_level_changed.emit(1)
+	check_approx(main.fly.speed_limit, 1.0, "lower levels leave the speed alone")
+	main.governor.shed_level_changed.emit(0)
+	check(not main.panel.shed_label.visible, "level 0 hides the readout")
+
 	# Back to Menu unpauses and swaps to the main menu
 	await press_action("pause")
 	pause.menu_button.pressed.emit()

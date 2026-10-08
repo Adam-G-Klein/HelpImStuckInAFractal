@@ -55,9 +55,11 @@ The step budget never drops below `FractalParams.MAX_STEPS_MIN`.
 - **Restore** one level when it stays above 40 fps for the restore dwell
   (2 s to start). Between 24 and 40 fps both timers reset: a dead band.
 - **Anti-flap:** a shed within 5 s of a restore doubles the restore dwell (up to
-  16 s). Holding a level for 10 s without shedding resets it to 2 s.
-- **Idle:** the level persists while idle, so moving again resumes where it
-  left off. The final still frame always renders at level 0 (no fog, full
+  16 s). A restore that sticks for 10 s (no shed since) resets it to 2 s. A
+  plain "10 s on one level" rule would fire while the shedder is still waiting
+  out a long restore dwell and undo the backoff.
+- **Idle:** the level and the moving render scale persist while idle, so
+  moving again resumes where it left off rather than at full scale. The final still frame always renders at level 0 (no fog, full
   detail and budget).
 - **Fast Controls off:** level 0, no shedding (as the scale stays 1.0 today).
 

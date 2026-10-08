@@ -82,5 +82,17 @@ func run() -> void:
 	fly.apply_look(0.0, -1e6)    # extreme pitch up
 	check_approx(absf(cam.forward().z), sin(deg_to_rad(89.0)), "pitch saturates 89 deg up", 1e-3)
 
+	# --- a zero mouse delta changes nothing and emits nothing ---
+	var emitted := [0]
+	cam.changed.connect(func(): emitted[0] += 1)
+	fly.apply_look(0.0, 0.0)
+	check_eq(emitted[0], 0, "apply_look(0, 0) emits no change")
+
+	# --- the load shedder's speed limit scales the travel speed ---
+	var full := fly.current_speed()
+	fly.speed_limit = 0.4
+	check_approx(fly.current_speed(), full * 0.4, "speed_limit scales current_speed()", 1e-9)
+	fly.speed_limit = 1.0
+
 	fly.queue_free()
 	await frames(1)

@@ -21,16 +21,32 @@ func run() -> void:
 	check_approx(g.scale, 0.25, "sustained slow frames reach the 0.25 floor", 1e-6)
 
 	# --- fast frames raise it again, never above 1.0 ---
+	g.shedder.reset()    # the floor also shed a level; this block is the scale loop alone
 	for i in 40: g.step(fast, true)
 	check_approx(g.scale, 1.0, "sustained fast frames reach the 1.0 ceiling", 1e-6)
 
-	# --- stopping: one FINAL_FRAME at scale 1, then IDLE ---
+	# --- stopping: settle, then one FINAL_FRAME at scale 1, then IDLE ---
 	g.step(0.016, true)                      # something is changing
 	g.step(0.016, false)                     # first still frame
-	check_eq(g.mode, ResolutionGovernor.Mode.FINAL_FRAME, "first still frame is FINAL_FRAME")
+	check_eq(g.mode, ResolutionGovernor.Mode.SETTLING, "first still frame is SETTLING")
+	for i in 7: g.step(0.016, false)         # 0.128 s quiet: still settling
+	check_eq(g.mode, ResolutionGovernor.Mode.SETTLING, "still settling before 0.15 s of quiet")
+	g.step(0.016, false)                     # 0.144 s
+	g.step(0.016, false)                     # 0.16 s
+	check_eq(g.mode, ResolutionGovernor.Mode.FINAL_FRAME, "0.15 s of quiet => FINAL_FRAME")
 	check_approx(g.scale, 1.0, "final frame renders at full scale", 1e-6)
 	g.step(0.016, false)                     # next still frame
 	check_eq(g.mode, ResolutionGovernor.Mode.IDLE, "then it goes IDLE")
+
+	# --- stray input while settling skips the expensive full-scale frame ---
+	var st := ResolutionGovernor.new()
+	st.step(0.016, true)
+	var saw_final := false
+	for i in 50:                             # a twitch every 0.1 s, never 0.15 s quiet
+		st.step(0.016, i % 6 == 0)
+		saw_final = saw_final or st.mode == ResolutionGovernor.Mode.FINAL_FRAME
+	check(not saw_final, "changes every 0.1 s never trigger a final frame")
+	check(st.mode != ResolutionGovernor.Mode.IDLE, "and never go idle")
 
 	# --- Fast Controls off: scale stays 1.0, same mode logic ---
 	var h := ResolutionGovernor.new()
@@ -38,6 +54,7 @@ func run() -> void:
 	for i in 10: h.step(slow, true)
 	check_approx(h.scale, 1.0, "fast controls off keeps scale at 1.0", 1e-6)
 	check_eq(h.mode, ResolutionGovernor.Mode.CONTINUOUS, "still CONTINUOUS while changing")
+	h.settle = 0.0
 	h.step(slow, false)
 	check_eq(h.mode, ResolutionGovernor.Mode.FINAL_FRAME, "one final frame with fast off")
 	h.step(slow, false)
@@ -56,3 +73,57 @@ func run() -> void:
 	m.min_scale = 0.75
 	m.step(slow, true)
 	check(m.scale >= 0.75, "raising the floor lifts the scale at once (%s)" % m.scale)
+
+	# --- the shed ladder: only once the scale is at its floor ---
+	var sh := ResolutionGovernor.new()
+	sh.fast_controls = true
+	sh.cooldown = 0.0
+	sh.min_scale = 0.25
+	sh.step(slow, true)
+	check(sh.scale < 1.0 and sh.shedder.level == 0, "first the scale drops, no shed yet")
+	for i in 12: sh.step(slow, true)         # scale reaches the floor, then 0.5 s+ slow
+	check_approx(sh.scale, 0.25, "scale at its floor", 1e-6)
+	check_eq(sh.shedder.level, 1, "then the shedder sheds a level")
+	check_eq(sh.applied_level(), 1, "and the view gets that level while moving")
+
+	# --- restoring: levels come off before the scale climbs ---
+	var climbed_early := false
+	var t := 0.0
+	while sh.shedder.level > 0 and t < 5.0:
+		sh.step(fast, true)
+		t += fast
+		if sh.shedder.level > 0 and sh.scale > 0.25 + 1e-6:
+			climbed_early = true
+	check_eq(sh.shedder.level, 0, "fast frames restore the level")
+	check(not climbed_early, "the scale held at its floor until level 0")
+	for i in 40: sh.step(fast, true)
+	check(sh.scale > 0.25, "then the scale climbs (%s)" % sh.scale)
+
+	# --- the level and the moving scale persist through idle; the final frame
+	# --- renders at level 0 and full scale ---
+	var p := ResolutionGovernor.new()
+	p.fast_controls = true
+	p.cooldown = 0.0
+	p.settle = 0.0
+	for i in 20: p.step(slow, true)
+	var moving_scale := p.scale
+	var moving_level := p.shedder.level
+	check(moving_level >= 1, "shed while moving (level %d)" % moving_level)
+	p.step(0.016, false)
+	check_eq(p.mode, ResolutionGovernor.Mode.FINAL_FRAME, "stopped: final frame")
+	check_eq(p.applied_level(), 0, "the final frame renders at level 0")
+	check_approx(p.scale, 1.0, "at full scale", 1e-6)
+	p.step(0.016, false)
+	check_eq(p.applied_level(), 0, "idle stays at level 0")
+	check_eq(p.shedder.level, moving_level, "the shed level is remembered through idle")
+	p.step(0.03, true)
+	check_approx(p.scale, moving_scale, "moving again resumes at the moving scale", 1e-6)
+	check_eq(p.applied_level(), moving_level, "and at the remembered level")
+
+	# --- turning Fast Controls off drops back to full quality ---
+	p.fast_controls = false
+	p.step(0.03, true)
+	check_eq(p.shedder.level, 0, "fast controls off resets the shed level")
+
+	for n in [g, st, h, m, sh, p]:
+		n.free()

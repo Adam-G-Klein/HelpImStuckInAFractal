@@ -81,3 +81,17 @@ func run() -> void:
 	check_approx(e.hit_epsilon(6.0, 0.5), 0.000025 * 6.0 * 9.0, "past it: x (t / start)^falloff", 1e-12)
 	check(e.hit_epsilon(6.0, 0.0) > 0.0 and is_finite(e.hit_epsilon(6.0, 0.0)),
 		"a camera on the surface stays finite")
+
+	# the step split works on a shed budget too
+	var b := FractalParams.new()
+	check_eq([b.coarse_steps(64), b.fine_steps(64)], [48, 16], "a 64-step budget splits 48 + 16")
+
+	# every colour mode has a fog tint; the white-background modes get a light one
+	for id in FractalParams.COLOR_MODE_IDS:
+		b.color_mode = id
+		var c := b.fog_color()
+		var lum := (c.x + c.y + c.z) / 3.0
+		if id == 5 or id == 6:
+			check(lum > 0.6, "mode %d (white background) has a light fog (%s)" % [id, c])
+		else:
+			check(lum < 0.4, "mode %d has a dark fog (%s)" % [id, c])

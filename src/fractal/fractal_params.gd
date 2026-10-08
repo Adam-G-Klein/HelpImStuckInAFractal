@@ -49,6 +49,23 @@ const DETAIL_RANGE_MAX := 1000.0
 const DETAIL_FALLOFF_MAX := 3.0
 const NEAR_FLOOR := 1e-6   # the near distance never reaches 0 (a camera on the surface)
 
+## Per colour-mode id, in the dropdown's order.
+const FOG_COLORS := {
+	0: Vector3(0.22, 0.22, 0.22),    # Grayscale
+	1: Vector3(0.14, 0.22, 0.36),    # Ice Fractal
+	2: Vector3(0.10, 0.17, 0.10),    # Borg
+	3: Vector3(0.24, 0.14, 0.30),    # Rainbow
+	4: Vector3(0.20, 0.10, 0.24),    # Rainbow 2
+	8: Vector3(0.14, 0.18, 0.30),    # Rainbow 3
+	15: Vector3(0.20, 0.20, 0.27),   # Rainbow Metal
+	5: Vector3(0.82, 0.88, 1.00),    # Blue (white background)
+	6: Vector3(0.85, 0.90, 1.00),    # Blue 2 (white background)
+	7: Vector3(0.30, 0.14, 0.27),    # Pink-Blue
+	16: Vector3(0.12, 0.26, 0.34),   # Ice Box
+	9: Vector3(0.12, 0.26, 0.34),    # Ice Box 2
+	14: Vector3(0.28, 0.20, 0.06),   # Gold
+}
+
 ## The resolution governor never drops below min_render_scale while moving.
 const RENDER_SCALE_FLOOR := 0.1
 
@@ -81,9 +98,18 @@ func hit_epsilon(t: float, near: float) -> float:
 	return eps
 
 
-func coarse_steps() -> int:
-	return max_steps * 3 / 4
+## The coarse share of a step budget: `budget`, or max_steps when it is 0 (the
+## load shedder passes a smaller budget).
+func coarse_steps(budget := 0) -> int:
+	return (budget if budget > 0 else max_steps) * 3 / 4
 
 
-func fine_steps() -> int:
-	return max_steps - coarse_steps()
+func fine_steps(budget := 0) -> int:
+	var b := budget if budget > 0 else max_steps
+	return b - coarse_steps(b)
+
+
+## The load shedder's fog tint for the current colour mode: a dark version of
+## each palette, and a light one for the two modes drawn on white.
+func fog_color() -> Vector3:
+	return FOG_COLORS.get(color_mode, Vector3(0.2, 0.2, 0.2))
