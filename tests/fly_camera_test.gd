@@ -54,6 +54,15 @@ func run() -> void:
 	var expected := clampf(DistanceEstimator.estimate(cam.eye(), params), 1e-6, 20.0) * cam.speed_factor
 	check_approx(fly.current_speed(), expected, "speed is clamped D(eye) * factor", 1e-6)
 
+	# --- holding Shift ("sprint") multiplies the travel speed by SPRINT_MULTIPLIER ---
+	var base_speed := fly.current_speed()
+	Input.action_press("sprint")
+	var sprint_speed := fly.current_speed()
+	Input.action_release("sprint")
+	check_approx(sprint_speed, base_speed * FlyCamera.SPRINT_MULTIPLIER,
+		"sprint multiplies the speed", 1e-6)
+	check_approx(fly.current_speed(), base_speed, "releasing sprint restores the speed", 1e-6)
+
 	# --- the wheel scales the factor by 1.25, clamped to [0.01, 100] ---
 	var f0 := cam.speed_factor
 	fly.scroll(true)
