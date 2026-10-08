@@ -113,6 +113,42 @@ static func load_file(path: String, params: FractalParams, camera: CameraState) 
 	return {"ok": true, "warnings": restore(data, params, camera)}
 
 
+## Write a graph-only noise file: {"version": VERSION, "noise": {...}}. The editor
+## uses this for its own Save…; a view save embeds the same dict under "noise".
+static func save_noise_file(path: String, noise_dict: Dictionary) -> Error:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return FileAccess.get_open_error()
+	file.store_string(JSON.stringify({"version": VERSION, "noise": noise_dict}, "\t", false))
+	file.close()
+	return OK
+
+
+## Read a graph-only noise file. Returns {ok, warnings, noise} where `noise` is the
+## raw dict (the caller builds the graph) or {} on failure. Never throws.
+static func load_noise_file(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {"ok": false, "warnings": ["No noise graph at %s" % path], "noise": {}}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {"ok": false, "warnings": ["Could not read %s" % path], "noise": {}}
+	var text := file.get_as_text()
+	file.close()
+	var json := JSON.new()
+	if json.parse(text) != OK:
+		return {"ok": false, "warnings": ["%s is not valid JSON" % path], "noise": {}}
+	var data: Variant = json.data
+	if not (data is Dictionary):
+		return {"ok": false, "warnings": ["%s does not contain a noise graph" % path], "noise": {}}
+	var version := int((data as Dictionary).get("version", 0))
+	if version != VERSION:
+		return {"ok": false, "warnings": ["Noise file version %d is not supported" % version], "noise": {}}
+	var noise: Variant = (data as Dictionary).get("noise", {})
+	if not (noise is Dictionary):
+		return {"ok": false, "warnings": ["%s has no noise section" % path], "noise": {}}
+	return {"ok": true, "warnings": [], "noise": noise}
+
+
 static func _failure(message: String) -> Dictionary:
 	return {"ok": false, "warnings": [message]}
 

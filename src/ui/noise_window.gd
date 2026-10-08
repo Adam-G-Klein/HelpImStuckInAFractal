@@ -1,0 +1,148 @@
+class_name NoiseWindow
+extends Window
+## The embedded window that hosts the NoiseEditor. It owns the one NoiseGraph,
+## hands it to the editor and to the FractalView, and turns the editor's toolbar
+## signals into graph edits and graph-only saves/loads in saves/noise/.
+##
+## Main owns this window: it opens and closes it (the N key and the controls-panel
+## button), and reads its graph for a view save.
+
+const DEFAULT_SIZE := Vector2i(1100, 700)
+
+var _view: FractalView
+var _editor: NoiseEditor
+var _files: WorkspaceFiles
+var _graph: NoiseGraph
+
+
+static func _resolver() -> Callable:
+	return Callable(NoiseNodeRegistry, "type_by_id")
+
+
+func setup(view: FractalView) -> void:
+	_view = view
+	title = "Noise field"
+	unresizable = false
+	size = DEFAULT_SIZE
+	min_size = Vector2i(500, 360)
+	visible = false
+	wrap_controls = false
+	close_requested.connect(close)
+
+	_editor = NoiseEditor.new()
+	_editor.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_editor)
+
+	_files = WorkspaceFiles.new()
+	_files.name = "NoiseFiles"
+	_files.subdir = "noise/"
+	_files.quick_save_enabled = false
+	add_child(_files)
+	_files.save_to.connect(_save_graph_to)
+	_files.load_from.connect(_load_graph_from)
+
+	_editor.add_node_requested.connect(_on_add_node_requested)
+	_editor.new_requested.connect(_on_new_requested)
+	_editor.save_requested.connect(_files.prompt_save)
+	_editor.load_requested.connect(_files.prompt_load)
+
+	if not _view.noise_status.is_connected(_on_view_status):
+		_view.noise_status.connect(_on_view_status)
+
+	_apply_graph(NoiseGraph.default_graph(_resolver()))
+
+
+func editor() -> NoiseEditor:
+	return _editor
+
+
+func graph() -> NoiseGraph:
+	return _graph
+
+
+func workspace_files() -> WorkspaceFiles:
+	return _files
+
+
+## This graph as a dict, for embedding under a view save's "noise" key.
+func to_dict() -> Dictionary:
+	return _graph.to_dict() if _graph != null else {}
+
+
+## Replace the graph from a dict (a view's "noise" section). Returns warnings.
+func apply_dict(d: Dictionary) -> Array:
+	var warnings: Array = []
+	var g := NoiseGraph.from_dict(d, warnings, _resolver())
+	_apply_graph(g)
+	return warnings
+
+
+func open() -> void:
+	visible = true
+	_center_in_parent()
+	grab_focus()
+
+
+func close() -> void:
+	visible = false
+
+
+func toggle() -> void:
+	if visible:
+		close()
+	else:
+		open()
+
+
+func _center_in_parent() -> void:
+	var base := DisplayServer.window_get_size()
+	var parent := get_parent()
+	if parent != null and parent.get_viewport() != null:
+		base = Vector2i(parent.get_viewport().get_visible_rect().size)
+	position = (base - size) / 2
+
+
+# --------------------------------------------------------------- wiring
+
+func _apply_graph(g: NoiseGraph) -> void:
+	_graph = g
+	_editor.show_graph(_graph)
+	if _view != null:
+		_view.set_noise_graph(_graph)
+
+
+func _on_add_node_requested(type_id: StringName, at: Vector2) -> void:
+	if _graph != null:
+		_graph.add_node(type_id, at)
+
+
+func _on_new_requested() -> void:
+	_apply_graph(NoiseGraph.default_graph(_resolver()))
+	_editor.set_status("New field")
+
+
+func _on_view_status(text: String) -> void:
+	if text != "":
+		_editor.set_status(text)
+
+
+func _save_graph_to(path: String) -> void:
+	var err := Workspace.save_noise_file(path, _graph.to_dict())
+	if err != OK:
+		_editor.set_status("Save failed (error %d)" % err)
+		return
+	_files.note_saved(path)
+	_editor.set_status("Saved %s" % path.get_file())
+
+
+func _load_graph_from(path: String) -> void:
+	var result := Workspace.load_noise_file(path)
+	if not result["ok"]:
+		_editor.set_status("Load failed: %s" % result["warnings"][0])
+		return
+	var warnings := apply_dict(result["noise"])
+	_files.note_loaded(path)
+	if warnings.is_empty():
+		_editor.set_status("Loaded %s" % path.get_file())
+	else:
+		_editor.set_status("Loaded %s with %d warning(s)" % [path.get_file(), warnings.size()])

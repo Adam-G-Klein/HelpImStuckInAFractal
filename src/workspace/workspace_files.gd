@@ -23,6 +23,14 @@ const FILTER := "*.json ; Saved views"
 
 var current_path := ""
 
+## An optional subdirectory under the saves directory, with a trailing slash, e.g.
+## "noise/". The noise editor points a second instance at saves/noise/ this way.
+var subdir := ""
+## Whether this instance answers the Cmd/Ctrl+S quick-save action. The view's
+## instance does; the noise editor's does not (it has only a Save… panel), so two
+## instances never both fire on one key press.
+var quick_save_enabled := true
+
 var _save_dialog: FileDialog
 var _load_dialog: FileDialog
 
@@ -44,7 +52,7 @@ static func ensure_directory() -> Error:
 
 
 func _ready() -> void:
-	ensure_directory()
+	_ensure_subdir()
 	_save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE, "Save view")
 	_save_dialog.file_selected.connect(_on_save_selected)
 	_load_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE, "Load view")
@@ -52,9 +60,21 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"workspace_quick_save"):
+	if quick_save_enabled and event.is_action_pressed(&"workspace_quick_save"):
 		quick_save()
 		get_viewport().set_input_as_handled()
+
+
+## This instance's directory: the saves directory plus its subdir.
+func _dir() -> String:
+	return directory() + subdir
+
+
+func _ensure_subdir() -> Error:
+	var absolute := ProjectSettings.globalize_path(_dir())
+	if DirAccess.dir_exists_absolute(absolute):
+		return OK
+	return DirAccess.make_dir_recursive_absolute(absolute)
 
 
 func save_dialog() -> FileDialog:
@@ -110,8 +130,8 @@ func _make_dialog(mode: FileDialog.FileMode, title: String) -> FileDialog:
 
 
 func _open(dialog: FileDialog, file_name: String) -> void:
-	ensure_directory()
-	dialog.current_dir = ProjectSettings.globalize_path(directory())
+	_ensure_subdir()
+	dialog.current_dir = ProjectSettings.globalize_path(_dir())
 	dialog.current_file = file_name
 	prompting.emit()
 	dialog.popup_centered_ratio(0.6)
