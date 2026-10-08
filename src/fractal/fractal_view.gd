@@ -6,6 +6,10 @@ extends Control
 
 const TAN_HALF_FOV := 0.36397023426620234  # tan(20 degrees), half of a 40 deg vertical FOV
 
+## A noise rebuild failed to compile, or recovered. "" means all clear. The panel
+## shows the message on its status line; the console gets it too.
+signal noise_status(text: String)
+
 var render_scale := 1.0
 var continuous := false
 
@@ -17,12 +21,20 @@ var _display: TextureRect
 var _material: ShaderMaterial
 var _pending_size := Vector2i(1280, 800)
 
+## The original mandelbox shader (with its inert NOISE stub) and its source. When
+## nothing is wired to the field's Output, this exact resource is used again, so
+## the picture and cost are identical to having no editor at all.
+var _base_shader: Shader
+var _base_code := ""
+var _noise_graph: NoiseGraph
+
 
 func _ready() -> void:
 	_viewport = $SubViewport
 	_rect = $SubViewport/ColorRect
 	_display = $Display
 	_material = _rect.material as ShaderMaterial
+	_capture_base()
 	_display.texture = _viewport.get_texture()
 	_display.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_display.stretch_mode = TextureRect.STRETCH_SCALE
@@ -40,6 +52,8 @@ func _ready() -> void:
 		_push_params()
 	if _camera != null:
 		_push_camera()
+	if _noise_graph != null:
+		_rebuild_noise()
 	request_frame()
 
 
@@ -53,6 +67,93 @@ func setup(params: FractalParams, camera: CameraState) -> void:
 	_push_params()
 	_push_camera()
 	request_frame()
+
+
+## Show a noise field on the fractal. The view listens to the graph: a structural
+## change or a baked (INT/BOOL/ENUM) parameter edit rebuilds the shader; a live
+## (FLOAT, or the tint colour) edit only pushes its uniform. Passing null, or a
+## graph with nothing wired to its Output, restores the base shader exactly.
+func set_noise_graph(graph: NoiseGraph) -> void:
+	if _noise_graph != null:
+		if _noise_graph.changed.is_connected(_on_noise_changed):
+			_noise_graph.changed.disconnect(_on_noise_changed)
+		if _noise_graph.node_changed.is_connected(_on_noise_node_changed):
+			_noise_graph.node_changed.disconnect(_on_noise_node_changed)
+	_noise_graph = graph
+	if _noise_graph != null:
+		_noise_graph.changed.connect(_on_noise_changed)
+		_noise_graph.node_changed.connect(_on_noise_node_changed)
+	_rebuild_noise()
+
+
+func noise_graph() -> NoiseGraph:
+	return _noise_graph
+
+
+func _capture_base() -> void:
+	if _base_shader == null and _material != null and _material.shader != null:
+		_base_shader = _material.shader
+		_base_code = _base_shader.code
+
+
+func _on_noise_changed() -> void:
+	_rebuild_noise()
+
+
+func _on_noise_node_changed(id: StringName, param_id: StringName) -> void:
+	if _noise_graph != null and NoiseCompiler.is_live_param(_noise_graph, id, param_id):
+		_push_noise()
+		request_frame()
+	else:
+		_rebuild_noise()
+
+
+## Compile the graph, swap the material's shader, and re-push every uniform. On a
+## compile failure the old shader stays and the failure is reported.
+func _rebuild_noise() -> void:
+	_capture_base()
+	if _material == null or _base_shader == null:
+		return
+	if _noise_graph == null:
+		_material.shader = _base_shader
+		_repush_all()
+		return
+	var result := NoiseCompiler.compile(_noise_graph)
+	if not result["errors"].is_empty():
+		var msg := "Noise: " + "; ".join(result["errors"])
+		push_warning(msg)
+		noise_status.emit(msg)
+		return
+	if (result["uniforms"] as Array).is_empty():
+		_material.shader = _base_shader
+	else:
+		var sh := Shader.new()
+		sh.code = NoiseCompiler.splice(_base_code, result["code"])
+		if sh.get_shader_uniform_list().is_empty():
+			var msg := "Noise: new shader failed to compile; kept the previous one"
+			push_error(msg)
+			noise_status.emit(msg)
+			return
+		_material.shader = sh
+	noise_status.emit("")
+	_repush_all()
+
+
+func _repush_all() -> void:
+	_push_params()
+	_push_camera()
+	if _material != null:
+		_material.set_shader_parameter("aspect", _aspect())
+	_push_noise()
+	request_frame()
+
+
+func _push_noise() -> void:
+	if _material == null or _noise_graph == null:
+		return
+	var values := NoiseCompiler.live_values(_noise_graph)
+	for name in values:
+		_material.set_shader_parameter(name, values[name])
 
 
 func shader_uniform_names() -> Array:

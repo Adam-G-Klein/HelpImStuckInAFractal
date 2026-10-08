@@ -19,6 +19,12 @@ uniform bool julia_enabled;
 uniform vec3 julia_point;
 uniform float box_half;
 
+// NOISE:BEGIN
+float noise_displace(vec3 p) { return 0.0; }
+float noise_step_scale() { return 1.0; }
+vec3 noise_tint(vec3 col, vec3 p) { return col; }
+// NOISE:END
+
 // Mandelbox distance estimate, up to `iters` iterations (<= 32).
 float de(vec3 p, int iters) {
 	vec3 c = julia_enabled ? julia_point : p;
@@ -39,7 +45,7 @@ float de(vec3 p, int iters) {
 		z = scale * z + c;
 		dz = -dz * scale + 1.0;
 	}
-	return length(z) / abs(dz);
+	return length(z) / abs(dz) + noise_displace(p);
 }
 
 // The "Ice Fractal" field: a 16-iteration Mandelbox orbit from z=0, c=q, no
@@ -59,7 +65,7 @@ float field(vec3 q) {
 		z *= k;
 		z = scale * z + c;
 	}
-	return length(z) - 8.0;
+	return length(z) - 8.0 + noise_displace(q);
 }
 
 // Central-difference normal from the high-precision estimator.
@@ -135,7 +141,7 @@ void fragment() {
 			vec3 pos = eye + dir * total;
 			float d = de(pos, 16);
 			if (d < precision * total * 2.0) { n1 = i; break; }
-			total += d;
+			total += d * noise_step_scale();
 			if (total > t_exit) { left_cube = true; break; }
 		}
 
@@ -146,7 +152,7 @@ void fragment() {
 				vec3 pos = eye + dir * total;
 				float d = de(pos, 32);
 				if (d < precision * total) { n2 = i; break; }
-				total += d;
+				total += d * noise_step_scale();
 				if (total > t_exit) { left_cube = true; break; }
 			}
 		}
@@ -216,7 +222,7 @@ void fragment() {
 			} else {
 				col = vec3(inv);
 			}
-				COLOR = vec4(col, 1.0);
+				COLOR = vec4(noise_tint(col, v), 1.0);
 			}
 		}
 	}
