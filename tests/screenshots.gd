@@ -115,7 +115,77 @@ func _run() -> void:
 			_check_noise(ridges, plain)
 		plain_view.queue_free()
 
+	await _capture_windows(view)
 	view.queue_free()
+
+
+## The console and the noise editor, rendered embedded in this one window (so
+## no second native window opens) and cropped out of the root's frame. Each
+## must have drawn something: a uniform crop means the window did not lay out.
+func _capture_windows(view: FractalView) -> void:
+	root.gui_embed_subwindows = true
+
+	var table := AttributeTable.new(MandelboxShape.specs())
+	var keymap := Keymap.new()
+	keymap.add_axis(&"a", "Axis A", 1.0, KEY_E, KEY_Q)
+	var clock := Clock.new()
+	root.add_child(clock)
+	var console := ConsoleWindow.new()
+	console.setup(table, keymap, clock, MandelboxShape.group_tooltips(), func() -> float: return 1.0)
+	root.add_child(console)
+	console.open()
+	console.position = Vector2i.ZERO
+	console.size = Vector2i(1000, 700)
+	await _capture_window("console_window", console)
+	console.queue_free()
+
+	var noise := NoiseWindow.new()
+	root.add_child(noise)
+	noise.setup(view)
+	noise.open()
+	noise.position = Vector2i.ZERO
+	noise.size = Vector2i(1100, 700)
+	await _capture_window("noise_window", noise)
+	noise.queue_free()
+	clock.queue_free()
+	for id in [&"a"]:
+		for suffix in ["pos", "neg"]:
+			var action := StringName("axis_%s_%s" % [id, suffix])
+			if InputMap.has_action(action):
+				InputMap.erase_action(action)
+
+
+func _capture_window(id: String, window: Window) -> void:
+	await process_frame
+	await process_frame
+	await RenderingServer.frame_post_draw
+	var frame := root.get_texture().get_image()
+	if frame == null:
+		_fail(id, "no_image")
+		return
+	var rect := Rect2i(window.position, window.size).intersection(Rect2i(Vector2i.ZERO, frame.get_size()))
+	if rect.size.x < 100 or rect.size.y < 100:
+		_fail(id, "window_rect=%s (not laid out inside the frame)" % rect)
+		return
+	var crop := frame.get_region(rect)
+	crop.save_png(ProjectSettings.globalize_path(SHOT_DIR + "/%s.png" % id))
+	_check_not_uniform(id, crop)
+
+
+## A UI capture must contain more than one colour: a blank or unlaid-out window
+## renders as a single flat colour.
+func _check_not_uniform(id: String, img: Image) -> void:
+	var first := img.get_pixel(0, 0)
+	var distinct := 0
+	for y in range(0, img.get_height(), 4):
+		for x in range(0, img.get_width(), 4):
+			var c := img.get_pixel(x, y)
+			if absf(c.r - first.r) + absf(c.g - first.g) + absf(c.b - first.b) > 0.1:
+				distinct += 1
+	if distinct > 50:
+		_pass(id)
+	else:
+		_fail(id, "distinct=%d (the window drew a flat colour)" % distinct)
 
 
 ## The noise view must not be blank and must differ from the same view with no
