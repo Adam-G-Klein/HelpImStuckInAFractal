@@ -92,15 +92,6 @@ func window_point(window: Window, local: Vector2) -> Vector2:
 	return window_origin(window) + local
 
 
-## Is `control` drawn and inside its window's visible area, so a click can land?
-func is_reachable(control: Control) -> bool:
-	if not control.is_visible_in_tree():
-		return false
-	var w := control.get_window()
-	var inside := Rect2(Vector2.ZERO, Vector2(w.size)) if w != root else root.get_visible_rect()
-	return inside.has_point(control.get_global_rect().get_center())
-
-
 # ------------------------------------------------------------ mouse
 
 ## Move the mouse to a control's centre or to a global point.
