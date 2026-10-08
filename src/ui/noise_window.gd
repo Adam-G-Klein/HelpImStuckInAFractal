@@ -11,6 +11,11 @@ extends Window
 const DEFAULT_SIZE := Vector2i(1100, 700)
 const MIN_SIZE := Vector2i(500, 360)
 
+## A key this window left unhandled (a Ctrl tap, Cmd+S…). Showing an embedded
+## window gives it keyboard focus, and a focused window keeps keys from the main
+## window, so Main runs these through its own dispatch.
+signal unhandled_key(event: InputEventKey)
+
 var _view: FractalView
 var _editor: NoiseEditor
 var _files: WorkspaceFiles
@@ -83,9 +88,9 @@ func apply_dict(d: Dictionary) -> Array:
 func open() -> void:
 	UiScale.center_over(self, _parent_window())
 	visible = true
-	# Deliberately NOT grab_focus(): the main viewport keeps keyboard focus so N
-	# and Escape still reach Main. Clicking into the window focuses it for typing,
-	# and then _unhandled_key_input below closes it on N or Escape.
+	# No grab_focus(): showing an embedded window focuses it already. While it
+	# holds focus, N and Escape close it (_unhandled_input below) and every other
+	# key reaches Main through unhandled_key. A click on the view takes focus back.
 
 
 func close() -> void:
@@ -99,14 +104,17 @@ func toggle() -> void:
 		open()
 
 
-## When the window itself holds keyboard focus (the user clicked into it), N and
-## Escape still close it. close_requested is emitted so Main recaptures the mouse.
+## While this window holds keyboard focus, N and Escape close it
+## (close_requested is emitted so Main recaptures the mouse); any other key it
+## did not use goes on to Main.
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if event.is_action_pressed(&"toggle_noise_editor") or event.is_action_pressed(&"pause"):
 		close_requested.emit()
 		set_input_as_handled()
+	elif event is InputEventKey:
+		unhandled_key.emit(event)
 
 
 ## The window this one opens over (the main window), or null before it is added.

@@ -39,6 +39,13 @@ var _free_requested := false
 ## Input.mouse_mode, which a headless run cannot report as CAPTURED.
 var _captured := false
 var _ctrl := CtrlTap.new()
+## The viewports whose focused text field silences WASD, the axis keys, N and
+## the Ctrl tap: the main window's, the console's and the noise window's. One
+## array, shared by reference with the fly camera and the axis controller.
+var _text_viewports: Array = []
+## The sub-windows pause() hid and resume() shows again: embedded windows are
+## drawn above every canvas layer, so an open console would cover the pause menu.
+var _hidden_by_pause: Array[Window] = []
 
 
 func _ready() -> void:
@@ -70,7 +77,7 @@ func _ready() -> void:
 	_build_axis_controller()
 
 	# The console and the main window are separate viewports; typing in either
-	# must silence WASD and the axis keys.
+	# must silence WASD and the axis keys. (The noise window joins when built.)
 	fly.set_text_viewports(_focus_viewports())
 
 	_build_workspace_files()
@@ -129,6 +136,7 @@ func _build_console() -> void:
 		func() -> float: return camera.speed_factor)
 	add_child(_console)
 	_console.toggle_requested.connect(_on_console_toggle)
+	_console.unhandled_key.connect(_on_window_key)
 
 
 func _build_axis_controller() -> void:
@@ -139,10 +147,12 @@ func _build_axis_controller() -> void:
 
 
 func _focus_viewports() -> Array:
-	var vps: Array = [get_viewport()]
-	if _console != null:
-		vps.append(_console)
-	return vps
+	if _text_viewports.is_empty():
+		_text_viewports.append(get_viewport())
+	for w in [_console, _noise]:
+		if w != null and not _text_viewports.has(w):
+			_text_viewports.append(w)
+	return _text_viewports
 
 
 func _build_noise_window() -> void:
@@ -151,6 +161,8 @@ func _build_noise_window() -> void:
 	add_child(_noise)
 	_noise.setup(view)
 	_noise.close_requested.connect(_update_mouse)
+	_noise.unhandled_key.connect(_on_window_key)
+	_focus_viewports()
 
 
 func _toggle_noise() -> void:
@@ -190,6 +202,10 @@ func _open_console_from_menu() -> void:
 
 func pause() -> void:
 	get_tree().paused = true
+	for w: Window in [_console, _noise]:
+		if w != null and w.visible:
+			w.visible = false
+			_hidden_by_pause.append(w)
 	_pause.open()
 	_update_mouse()
 
@@ -197,6 +213,10 @@ func pause() -> void:
 func resume() -> void:
 	_pause.close()
 	get_tree().paused = false
+	for w in _hidden_by_pause:
+		if is_instance_valid(w):
+			w.visible = true
+	_hidden_by_pause.clear()
 	_update_mouse()
 
 
@@ -352,6 +372,15 @@ func _on_console_toggle() -> void:
 		if not _console.visible:
 			_free_requested = false
 	_update_mouse()
+
+
+## A key the focused console or noise window did not use. An embedded window
+## that holds keyboard focus keeps keys from the main window, so they come here
+## to get the same Ctrl tap / Escape / N / screenshot / quick-save handling.
+func _on_window_key(event: InputEventKey) -> void:
+	_unhandled_input(event)
+	if _files != null and event.is_action_pressed(&"workspace_quick_save"):
+		_files.quick_save()
 
 
 func _active_camera() -> Node:

@@ -7,6 +7,10 @@ extends Window
 ## embedded window. A Ctrl tap in this window forwards `toggle_requested`.
 
 signal toggle_requested
+## A key this window's controls left unhandled (Escape, N, Cmd+S…). Showing an
+## embedded window gives it keyboard focus, and a focused window keeps keys from
+## the main window, so Main runs these through its own dispatch.
+signal unhandled_key(event: InputEventKey)
 
 ## In points (logical units); UiScale.px turns them into window pixels.
 const DEFAULT_SIZE := Vector2i(1000, 700)
@@ -98,6 +102,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if feed_ctrl(event):
 		set_input_as_handled()
+		return
+	# Ctrl itself stays here: this window's own detector owns the tap.
+	if event is InputEventKey and (event as InputEventKey).physical_keycode != KEY_CTRL:
+		unhandled_key.emit(event)
 
 
 func _refresh_sources() -> void:

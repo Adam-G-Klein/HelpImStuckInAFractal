@@ -4,10 +4,11 @@ extends "res://tests/ui_test_case.gd"
 ## Ctrl tap opens the console and frees the mouse; typing into the Scale row
 ## reaches the shader; Fold limit bound to Axis A at gain 0.5 moves while E is
 ## held; WASD flies the camera and the wheel changes its speed; the pause
-## menu's Noise editor… (and, once it exists, Console…) button opens its
-## window; a Value noise is added and wired; Save view… then New + Load view…
-## restores the shape, the binding, the camera and the noise; a resized window
-## asks the view for a frame; Back to Menu returns to the title.
+## menu's Noise editor… and Console… buttons open their windows, and Escape
+## reaches Main even while one of them holds keyboard focus; a Value noise is
+## added and wired; Save view… then New + Load view… restores the shape, the
+## binding, the camera and the noise; a resized window asks the view for a
+## frame; Back to Menu returns to the title.
 ##
 ## Main, MainMenu and PauseMenu are used untyped (as main_test.gd does): their
 ## scripts name the Settings autoload, which a `-s` script cannot see when it
@@ -213,21 +214,27 @@ func _pause_menu_opens_windows() -> void:
 	check(not paused and not pause.visible, "and resumes")
 	check(not main.is_mouse_captured(), "with the mouse free to use it")
 
-	# Console… arrives with the usability fixes (stream A); until then the guard
-	# keeps this passing. Remove the guard once both streams are merged.
-	if pause.get("console_button") != null:
-		await ui.tap(KEY_ESCAPE)
-		check(paused and pause.visible, "Escape pauses again")
-		var console_button: Button = pause.get("console_button")
-		await ui.click(console_button)
-		await ui.frames(1)
-		check(main.console().visible, "a click on Console… opens the console")
-		check(not paused and not pause.visible, "and resumes")
-		check(not main.is_mouse_captured(), "with the mouse free")
-		await ui.tap(KEY_CTRL)
-		await ui.frames(1)
-	else:
-		print("  NOTE the pause menu has no Console… button yet (stream A); that step is skipped")
+	# The noise window opened focused, and a focused noise window takes Escape
+	# for itself: the first Escape closes it, the second pauses.
+	await ui.tap(KEY_ESCAPE)
+	check(not main.noise_window().visible and not paused, "Escape first closes the focused noise window")
+	await ui.tap(KEY_ESCAPE)
+	check(paused and pause.visible, "a second Escape pauses again")
+	await ui.click(pause.console_button)
+	await ui.frames(1)
+	check(main.console().visible, "a click on Console… opens the console")
+	check(not paused and not pause.visible, "and resumes")
+	check(not main.is_mouse_captured(), "with the mouse free")
+	# the console holds keyboard focus now; Escape still reaches Main and pauses
+	await ui.tap(KEY_ESCAPE)
+	check(paused and pause.visible, "Escape with the console focused pauses")
+	check(not main.console().visible, "the console steps aside so it does not cover the pause menu")
+	await ui.click(pause.resume_button)
+	await ui.frames(1)
+	check(not paused and main.console().visible, "a click on Resume resumes with the console back")
+	await ui.tap(KEY_CTRL)
+	await ui.frames(1)
+	check(not main.console().visible and main.is_mouse_captured(), "a Ctrl tap closes the console and recaptures")
 
 
 func _wire_value_noise() -> void:

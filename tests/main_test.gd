@@ -184,8 +184,32 @@ func run() -> void:
 	check(console.visible, "the pause Console button opens the console")
 	check(not paused and not pause.visible, "and resumes")
 	check(not main.is_mouse_captured(), "with the mouse left free to use it")
+	# The console holds keyboard focus once open (an embedded window takes it
+	# when shown), so keys it does not use are handed on to Main: Escape pauses.
+	# Embedded windows draw above the pause menu, so pausing hides them and
+	# resuming brings them back.
+	var esc := InputEventKey.new()
+	esc.physical_keycode = KEY_ESCAPE
+	esc.keycode = KEY_ESCAPE
+	esc.pressed = true
+	console._unhandled_input(esc)
+	check(paused and pause.visible, "Escape in the focused console reaches Main and pauses")
+	check(not console.visible, "pausing hides the console so the pause menu is not covered")
+	main.resume()
+	check(not paused and console.visible, "resuming shows the console again")
 	_tap_ctrl(main)
 	check(not console.visible and main.is_mouse_captured(), "a Ctrl tap then closes it and recaptures")
+
+	# A Ctrl tap in the focused noise window reaches Main too and opens the console
+	nw.open()
+	nw._unhandled_input(_key(KEY_CTRL, true))
+	nw._unhandled_input(_key(KEY_CTRL, false))
+	check(console.visible, "a Ctrl tap in the focused noise window opens the console")
+	console.hide_console()
+	nw.close()
+	main._free_requested = false
+	main._update_mouse()
+	check(main.is_mouse_captured(), "flying again")
 
 	# a view save carries the noise graph, and loading restores it
 	nw.editor().add_node_requested.emit(&"value_noise", Vector2(200, 200))
