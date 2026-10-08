@@ -19,6 +19,11 @@ func run() -> void:
 	params.fast_controls = false
 	params.camera_mode = FractalParams.CameraMode.ORBIT
 	params.mouse_sensitivity = 0.2
+	params.detail = 2.5
+	params.detail_range = 40.0
+	params.detail_falloff = 1.5
+	params.max_steps = 256
+	params.min_render_scale = 0.4
 	var camera := CameraState.new()
 	camera.transform = Transform3D(Basis.IDENTITY, Vector3(1, -2, 0.5)).looking_at(Vector3(0, 0, 0.25), Vector3(0, 0, 1))
 	camera.speed_factor = 3.5
@@ -41,6 +46,11 @@ func run() -> void:
 	check(not p2.fast_controls, "fast controls")
 	check_eq(p2.camera_mode, FractalParams.CameraMode.ORBIT, "camera mode")
 	check_approx(p2.mouse_sensitivity, 0.2, "mouse sensitivity")
+	check_approx(p2.detail, 2.5, "detail")
+	check_approx(p2.detail_range, 40.0, "detail range")
+	check_approx(p2.detail_falloff, 1.5, "detail falloff")
+	check_eq(p2.max_steps, 256, "max steps")
+	check_approx(p2.min_render_scale, 0.4, "min render scale")
 	check(c2.eye().is_equal_approx(camera.eye()), "camera eye %s" % c2.eye())
 	check(c2.forward().is_equal_approx(camera.forward()), "camera forward %s" % c2.forward())
 	check(c2.up().is_equal_approx(camera.up()), "camera up %s" % c2.up())
@@ -80,6 +90,17 @@ func run() -> void:
 	p4.fold_limit = 0.5
 	Workspace.restore({"version": 1, "fractal": {"scale": -2.5}}, p4, CameraState.make_default())
 	check_approx(p4.fold_limit, 0.5, "a missing key leaves the value alone")
+
+	# --- the renderer options are checked too ---
+	var p6 := FractalParams.new()
+	var w6 := Workspace.restore({"version": 1, "fractal": {
+		"detail_falloff": -2.0, "max_steps": "lots", "detail": 0.0, "detail_range": 25,
+	}}, p6, CameraState.make_default())
+	check_approx(p6.detail_falloff, 0.0, "a negative falloff is ignored")
+	check_eq(p6.max_steps, 128, "a non-number step budget is ignored")
+	check_approx(p6.detail, 1.0, "a non-positive detail is ignored")
+	check_approx(p6.detail_range, 25.0, "an integer range restores")
+	check_eq(w6.size(), 3, "one warning each for the three bad ones: %s" % [w6])
 
 	# --- files that cannot load change nothing ---
 	var p5 := FractalParams.new()

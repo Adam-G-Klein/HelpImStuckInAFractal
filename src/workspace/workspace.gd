@@ -4,7 +4,8 @@ extends RefCounted
 ##
 ## What is saved: the shape (scale, the three radii), the colour mode, the
 ## precision, Julia mode and its point, fast controls, the camera mode, the
-## mouse sensitivity, and the camera's eye, orientation and speed factor. What
+## mouse sensitivity, the renderer options (level of detail, step budget and
+## minimum render scale), and the camera's eye, orientation and speed factor. What
 ## is not: anything derivable (the orbit centre, the governor's render scale,
 ## rendered pixels).
 ##
@@ -22,6 +23,7 @@ const PARAM_KEYS: Array[String] = [
 	"scale", "inner_radius", "fold_limit", "outer_radius", "color_mode",
 	"precision", "julia_enabled", "julia_point", "fast_controls",
 	"camera_mode", "mouse_sensitivity",
+	"detail", "detail_range", "detail_falloff", "max_steps", "min_render_scale",
 ]
 const CAMERA_MODE_NAMES: Array[String] = ["fly", "orbit"]
 
@@ -179,8 +181,12 @@ static func _parse_param(key: String, raw: Variant) -> Variant:
 		"camera_mode":
 			var index := CAMERA_MODE_NAMES.find(String(raw)) if raw is String else -1
 			return index if index >= 0 else null
-		"precision", "mouse_sensitivity":
+		"precision", "mouse_sensitivity", "detail", "detail_range", "min_render_scale":
 			return float(raw) if (raw is float or raw is int) and float(raw) > 0.0 else null
+		"detail_falloff":
+			return float(raw) if (raw is float or raw is int) and float(raw) >= 0.0 else null
+		"max_steps":
+			return int(raw) if (raw is float or raw is int) and float(raw) >= 1.0 else null
 		_:
 			return float(raw) if (raw is float or raw is int) else null
 

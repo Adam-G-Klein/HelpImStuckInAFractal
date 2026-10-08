@@ -179,7 +179,7 @@ func capture() -> Image:
 
 
 func set_render_scale(s: float) -> void:
-	render_scale = clampf(s, 0.25, 1.0)
+	render_scale = clampf(s, FractalParams.RENDER_SCALE_FLOOR, 1.0)
 	_apply_size()
 
 
@@ -258,12 +258,17 @@ func _push_params() -> void:
 	_material.set_shader_parameter("min_r2", _params.inner_radius * _params.inner_radius)
 	_material.set_shader_parameter("fixed_r2", _params.outer_radius * _params.outer_radius)
 	_material.set_shader_parameter("fold_limit", _params.fold_limit)
-	_material.set_shader_parameter("precision", _params.precision)
+	_material.set_shader_parameter("precision", _params.precision / _params.detail)
 	_material.set_shader_parameter("color_mode", _params.color_mode)
 	_material.set_shader_parameter("julia_enabled", _params.julia_enabled)
 	_material.set_shader_parameter("julia_point", _params.julia_point)
 	_material.set_shader_parameter("tan_half_fov", TAN_HALF_FOV)
 	_material.set_shader_parameter("box_half", 20.0 if _params.julia_enabled else 2.0)
+	_material.set_shader_parameter("detail_range", _params.detail_range)
+	_material.set_shader_parameter("detail_falloff", _params.detail_falloff)
+	_material.set_shader_parameter("coarse_steps", _params.coarse_steps())
+	_material.set_shader_parameter("fine_steps", _params.fine_steps())
+	_push_near()
 
 
 func _push_camera() -> void:
@@ -273,3 +278,14 @@ func _push_camera() -> void:
 	_material.set_shader_parameter("cam_right", _camera.right())
 	_material.set_shader_parameter("cam_up", _camera.up())
 	_material.set_shader_parameter("cam_forward", _camera.forward())
+	_push_near()
+
+
+## The camera's distance to the nearest surface, which the level-of-detail range
+## is measured in. It depends on both the camera and the shape, so both pushes
+## refresh it.
+func _push_near() -> void:
+	if _material == null or _params == null or _camera == null:
+		return
+	var near := maxf(DistanceEstimator.estimate(_camera.eye(), _params), FractalParams.NEAR_FLOOR)
+	_material.set_shader_parameter("near_dist", near)

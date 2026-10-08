@@ -42,3 +42,17 @@ func run() -> void:
 	check_eq(h.mode, ResolutionGovernor.Mode.FINAL_FRAME, "one final frame with fast off")
 	h.step(slow, false)
 	check_eq(h.mode, ResolutionGovernor.Mode.IDLE, "then idle with fast off")
+
+	# --- the floor follows min_scale, and raising it lifts the scale ---
+	var m := ResolutionGovernor.new()
+	m.fast_controls = true
+	m.cooldown = 0.0
+	m.min_scale = 0.5
+	for i in 20: m.step(slow, true)
+	check_approx(m.scale, 0.5, "slow frames stop at min_scale", 1e-6)
+	m.min_scale = 0.1
+	for i in 20: m.step(slow, true)
+	check(m.scale < 0.5 and m.scale >= 0.1, "a lower floor lets it drop further (%s)" % m.scale)
+	m.min_scale = 0.75
+	m.step(slow, true)
+	check(m.scale >= 0.75, "raising the floor lifts the scale at once (%s)" % m.scale)

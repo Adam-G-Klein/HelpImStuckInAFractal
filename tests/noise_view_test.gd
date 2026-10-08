@@ -7,7 +7,8 @@ extends "res://tests/test_case.gd"
 
 const BASE_UNIFORMS := ["eye", "cam_right", "cam_up", "cam_forward", "tan_half_fov",
 	"aspect", "scale", "min_r2", "fixed_r2", "fold_limit", "precision",
-	"color_mode", "julia_enabled", "julia_point", "box_half"]
+	"color_mode", "julia_enabled", "julia_point", "box_half",
+	"detail_range", "detail_falloff", "near_dist", "coarse_steps", "fine_steps"]
 
 
 func _names(view: FractalView) -> Array:

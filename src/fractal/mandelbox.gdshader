@@ -13,17 +13,36 @@ uniform float scale;
 uniform float min_r2;
 uniform float fixed_r2;
 uniform float fold_limit;
-uniform float precision;
+uniform float precision;  // the view's precision already divided by its detail
 uniform int color_mode;
 uniform bool julia_enabled;
 uniform vec3 julia_point;
 uniform float box_half;
+// Level of detail with distance (see hit_eps) and the step budget.
+uniform float detail_range;
+uniform float detail_falloff;
+uniform float near_dist;
+uniform int coarse_steps;
+uniform int fine_steps;
 
 // NOISE:BEGIN
 float noise_displace(vec3 p) { return 0.0; }
 float noise_step_scale() { return 1.0; }
 vec3 noise_tint(vec3 col, vec3 p) { return col; }
 // NOISE:END
+
+// The hit threshold at ray distance t: the pixel cone precision * t (detail is
+// folded into `precision` on the CPU, so the defaults are bit-for-bit the plain
+// cone), coarsened by (t / start)^falloff past start = detail_range x the
+// camera's distance to the nearest surface. Mirrors FractalParams.hit_epsilon.
+float hit_eps(float t) {
+	float e = precision * t;
+	float start = detail_range * near_dist;
+	if (detail_falloff > 0.0 && t > start) {
+		e *= pow(t / start, detail_falloff);
+	}
+	return e;
+}
 
 // Mandelbox distance estimate, up to `iters` iterations (<= 32).
 float de(vec3 p, int iters) {
@@ -135,23 +154,26 @@ void fragment() {
 		float total = max(tb.x, 0.0);
 		bool left_cube = false;
 
-		// Phase 1: low precision (N=16), up to 96 steps.
-		int n1 = 96;
-		for (int i = 0; i < 96; i++) {
+		// Phase 1: low precision (N=16), up to coarse_steps (<= 384) steps.
+		int n1 = coarse_steps;
+		for (int i = 0; i < 384; i++) {
+			if (i >= coarse_steps) { break; }
 			vec3 pos = eye + dir * total;
 			float d = de(pos, 16);
-			if (d < precision * total * 2.0) { n1 = i; break; }
+			if (d < hit_eps(total) * 2.0) { n1 = i; break; }
 			total += d * noise_step_scale();
 			if (total > t_exit) { left_cube = true; break; }
 		}
 
-		// Phase 2: high precision (N=32), up to 32 steps, continuing on.
-		int n2 = 32;
+		// Phase 2: high precision (N=32), up to fine_steps (<= 128) steps,
+		// continuing on.
+		int n2 = fine_steps;
 		if (!left_cube) {
-			for (int i = 0; i < 32; i++) {
+			for (int i = 0; i < 128; i++) {
+				if (i >= fine_steps) { break; }
 				vec3 pos = eye + dir * total;
 				float d = de(pos, 32);
-				if (d < precision * total) { n2 = i; break; }
+				if (d < hit_eps(total)) { n2 = i; break; }
 				total += d * noise_step_scale();
 				if (total > t_exit) { left_cube = true; break; }
 			}
@@ -160,7 +182,9 @@ void fragment() {
 		if (left_cube) {
 			COLOR = vec4(bg, 1.0);  // the only miss is leaving the cube
 		} else {
-			float ce = float(n1 + n2) / 128.0;
+			// Step-count shading stays on the original 128-step scale whatever the
+			// budget, so a ray that hits looks the same; one that ran out is 1.
+			float ce = n2 == fine_steps ? 1.0 : min(float(n1 + n2) / 128.0, 1.0);
 			float inv = 1.0 - ce;
 			if (color_mode == 0) {
 				COLOR = vec4(vec3(inv), 1.0);  // Grayscale needs no normal: stay cheap
@@ -168,7 +192,7 @@ void fragment() {
 				vec3 v = eye + dir * total;
 			vec3 h = v * 0.5;
 			vec3 eh = eye * 0.5;
-			float delta = precision * total * 40.0;
+			float delta = hit_eps(total) * 40.0;
 
 			// Normal: NF for modes 1..9 outside Julia mode, N otherwise.
 			vec3 n;

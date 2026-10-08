@@ -11,7 +11,12 @@
 		"julia_point": [-0.23, 1.512, 1.892],
 		"fast_controls": true,
 		"camera_mode": "fly",
-		"mouse_sensitivity": 0.1
+		"mouse_sensitivity": 0.1,
+		"detail": 1.0,
+		"detail_range": 10.0,
+		"detail_falloff": 0.0,
+		"max_steps": 128,
+		"min_render_scale": 0.25
 	},
 	"camera": {
 		"eye": [8.175847, 3.81246, 3.283393],
