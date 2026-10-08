@@ -8,6 +8,7 @@ extends Window
 
 signal toggle_requested
 
+## In points (logical units); UiScale.px turns them into window pixels.
 const DEFAULT_SIZE := Vector2i(1000, 700)
 const MIN_SIZE := Vector2i(700, 400)
 
@@ -20,8 +21,9 @@ var _ctrl := CtrlTap.new()
 func setup(table: AttributeTable, keymap: Keymap, clock: Clock, group_tooltips: Dictionary, speed_source: Callable = Callable()) -> void:
 	_keymap = keymap
 	title = "Console"
-	size = DEFAULT_SIZE
-	min_size = MIN_SIZE
+	UiScale.apply(self)
+	size = UiScale.px(DEFAULT_SIZE, self)
+	min_size = UiScale.px(MIN_SIZE, self)
 	unresizable = false
 	wrap_controls = false
 	visible = false
@@ -67,7 +69,7 @@ func set_resolved(values: Dictionary) -> void:
 
 
 func open() -> void:
-	_center_in_parent()
+	UiScale.center_over(self, _parent_window())
 	visible = true
 
 
@@ -107,9 +109,7 @@ func _refresh_sources() -> void:
 	_inspector.set_sources(axis_list)
 
 
-func _center_in_parent() -> void:
-	var base := DisplayServer.window_get_size()
+## The window this one opens over (the main window), or null before it is added.
+func _parent_window() -> Window:
 	var parent := get_parent()
-	if parent != null and parent.get_viewport() != null:
-		base = Vector2i(parent.get_viewport().get_visible_rect().size)
-	position = (base - size) / 2
+	return parent.get_window() if parent != null else null

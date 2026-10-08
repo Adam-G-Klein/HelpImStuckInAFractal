@@ -9,6 +9,8 @@ extends Node
 ## the PauseMenu; a Ctrl tap opens the console.
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
+## The main window's size in points (logical units); see UiScale.
+const WINDOW_SIZE := Vector2i(1280, 800)
 
 var params: FractalParams
 var camera: CameraState
@@ -39,6 +41,10 @@ var _ctrl := CtrlTap.new()
 
 
 func _ready() -> void:
+	# Normally done by the title menu already; repeated so main.tscn run on its
+	# own is scaled too (both calls are no-ops the second time).
+	UiScale.apply(get_window())
+	UiScale.fit_main_window(get_window(), WINDOW_SIZE)
 	params = FractalParams.new()
 	camera = CameraState.make_default()
 

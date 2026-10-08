@@ -7,7 +7,9 @@ extends Window
 ## Main owns this window: it opens and closes it (the N key and the controls-panel
 ## button), and reads its graph for a view save.
 
+## In points (logical units); UiScale.px turns them into window pixels.
 const DEFAULT_SIZE := Vector2i(1100, 700)
+const MIN_SIZE := Vector2i(500, 360)
 
 var _view: FractalView
 var _editor: NoiseEditor
@@ -23,8 +25,9 @@ func setup(view: FractalView) -> void:
 	_view = view
 	title = "Noise field"
 	unresizable = false
-	size = DEFAULT_SIZE
-	min_size = Vector2i(500, 360)
+	UiScale.apply(self)
+	size = UiScale.px(DEFAULT_SIZE, self)
+	min_size = UiScale.px(MIN_SIZE, self)
 	visible = false
 	wrap_controls = false
 	close_requested.connect(close)
@@ -78,7 +81,7 @@ func apply_dict(d: Dictionary) -> Array:
 
 
 func open() -> void:
-	_center_in_parent()
+	UiScale.center_over(self, _parent_window())
 	visible = true
 	# Deliberately NOT grab_focus(): the main viewport keeps keyboard focus so N
 	# and Escape still reach Main. Clicking into the window focuses it for typing,
@@ -106,12 +109,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		set_input_as_handled()
 
 
-func _center_in_parent() -> void:
-	var base := DisplayServer.window_get_size()
+## The window this one opens over (the main window), or null before it is added.
+func _parent_window() -> Window:
 	var parent := get_parent()
-	if parent != null and parent.get_viewport() != null:
-		base = Vector2i(parent.get_viewport().get_visible_rect().size)
-	position = (base - size) / 2
+	return parent.get_window() if parent != null else null
 
 
 # --------------------------------------------------------------- wiring
