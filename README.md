@@ -277,6 +277,20 @@ the headless renderer produces no pixels, the actual render is verified by
 the default), and writes the results plus a `PASS`/`FAIL` log to
 `tests/out/screenshots.txt`.
 
+The UI suites drive the real widgets the way a player does, still headless.
+`tests/ui_driver.gd` (`UiDriver`) turns the 64x64 headless root into a
+1280x800 logical surface and pushes synthetic mouse, wheel, trackpad-pan and
+key events through the root at window-aware global coordinates, so clicks
+land in the embedded console and noise windows, their dropdown popups and
+file panels through Godot's own hit-testing. `ui_driver_test.gd` checks each
+primitive; `ui_console_test.gd` scrolls the Shape list, picks dropdown items,
+clicks and drags sliders, types values and edits axes; `ui_noise_test.gd` adds
+a node from the right-click menu, wires it, edits it live and saves and loads
+the graph; `ui_journey_test.gd` plays one session from the title menu to Back
+to Menu. A check that fails today because of a known defect is reported as
+`(known bug: …)` and marked `# BUG:` in the test; it prints a `NOTE` once the
+defect is fixed so the marker can be removed.
+
 The reference capture from the site lives at
 **`docs/reference/icefractal-default.jpg`**. Put `screenshots/default_view.png`
 next to it to eyeball the default view against the original — float32 and no
