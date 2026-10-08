@@ -7,9 +7,10 @@ extends RefCounted
 ## content scale and sizes itself in px(); the main window is fitted once so it
 ## keeps its point size.
 ##
-## An EMBEDDED window (headless, the web, or any embedding viewport) is drawn
-## inside its embedder's canvas and so already inherits the embedder's scale:
-## it keeps factor 1 and is sized in logical units, or it would scale twice.
+## An EMBEDDED window (the console and noise windows: the project embeds them,
+## and headless and the web always do) is drawn inside its embedder's canvas and
+## so already inherits the embedder's scale: it keeps factor 1 and is sized in
+## logical units, or it would scale twice.
 
 ## Tests set this to stand in for the screen's scale; 0 means ask the display.
 static var override := 0.0

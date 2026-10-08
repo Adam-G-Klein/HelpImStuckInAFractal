@@ -1,9 +1,10 @@
 class_name TextFocus
 extends RefCounted
 ## Is a text-entry control focused in any of the given viewports? The main
-## window and the console are separate viewports (the console is a native
-## Window), so both the axis controller and the fly camera ask about both:
-## typing "e" into a spin box must never move an axis or the camera.
+## window, the console and the noise window are separate viewports (each
+## Window is its own viewport, even embedded), so the axis controller and the
+## fly camera ask about all of them: typing "e" into a spin box must never move
+## an axis or the camera.
 
 
 ## True when a LineEdit or TextEdit holds keyboard focus in any viewport.

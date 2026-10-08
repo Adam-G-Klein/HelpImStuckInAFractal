@@ -7,8 +7,9 @@ extends RefCounted
 ##   - any other key-down while armed disarms,
 ##   - a Ctrl key-up while armed fires.
 ## `feed(event)` returns true exactly when a tap fires; the caller then acts and
-## consumes the event. Main runs one against the main window; the console runs
-## one against its own window.
+## consumes the event. Main runs one against the main window (and the keys the
+## noise window hands on); the console runs one against its own window, which
+## holds keyboard focus while open.
 
 ## Optional `Callable() -> bool`: true while a text field is focused, so a tap
 ## never arms mid-typing.

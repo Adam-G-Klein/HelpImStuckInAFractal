@@ -100,6 +100,26 @@ func run() -> void:
 	main._free_requested = false
 	main._update_mouse()
 
+	# The same with real clicks through the root, where the console is embedded
+	# in the main window: a click on the console is the console's own, a click
+	# on the view beside it recaptures, and the console stays open throughout.
+	var ui := UiDriver.new(self)
+	await ui.setup()
+	_tap_ctrl(main)
+	await frames(1)
+	check(console.visible and console.is_embedded(), "the console opens embedded in the main window")
+	await ui.click(console.inspector().row(&"box_scale").get_child(0) as Control)
+	check(console.visible and not main.is_mouse_captured(),
+		"a click on the console stays in the console: it is open and the mouse is still free")
+	var beside := Vector2(ui.global_rect(console.inspector()).position.x * 0.5, 400)
+	check(not Rect2(Vector2(console.position), Vector2(console.size)).has_point(beside), "a point on the view beside the console")
+	await ui.click_at(beside)
+	check(main.is_mouse_captured(), "a click on the view beside the console recaptures the mouse")
+	check(console.visible, "and the console stays open and visible over the view")
+	console.hide_console()
+	main._free_requested = false
+	main._update_mouse()
+
 	# the pause menu owns Save / Load / Camera / Noise
 	var pause = main.pause_menu()   # untyped: see menus_test.gd
 	var files: WorkspaceFiles = main.workspace_files()

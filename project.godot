@@ -16,7 +16,7 @@ Settings="*res://src/settings/settings.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=800
 window/stretch/mode="disabled"
-window/subwindows/embed_subwindows=false
+window/subwindows/embed_subwindows=true
 
 [input]
 

@@ -1714,7 +1714,7 @@ const camTable = {
       tip: { ...R("orbit", 76), links: [RL("main", 205, "Main: only on a change"), RL("main", 171, "after a load")] } },
     { cells: ["marker", "drag the Julia ring (mouse free)", "press within 2 × RING_RADIUS = 20 px", "Captures depth = (julia_point − eye) · forward, then sets julia_point = unproject(mouse, depth): it slides in the plane facing the camera."],
       tip: { ...R("marker", 37), links: [RL("marker", 41, "the 20 px test"), RL("marker", 52, "unproject"), RL("tMarker", 29, "reprojects to the cursor")] } },
-    { cells: ["Main", "mouse capture", "FLY, not paused, noise closed", "Captured, otherwise visible; a click on the view while free in FLY recaptures (and is the user gesture pointer lock needs on the web). The console, a second window, no longer gates capture."],
+    { cells: ["Main", "mouse capture", "FLY, not paused, noise closed", "Captured, otherwise visible; a click on the view while free in FLY recaptures (and is the user gesture pointer lock needs on the web). The console window no longer gates capture."],
       tip: { ...R("main", 211), links: [RL("main", 269, "click to capture")] } },
   ],
 };

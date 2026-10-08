@@ -1,10 +1,12 @@
 class_name ConsoleWindow
 extends Window
-## The native second window ("Fractacular embedded"): an HSplit of the Shape
-## inspector and the Movement pane, over the one Mandelbox shape being flown
-## through in the main window. It is native because the project sets
-## embed_subwindows = false; on the web that is ignored and it falls back to an
-## embedded window. A Ctrl tap in this window forwards `toggle_requested`.
+## The console ("Fractacular embedded"): an HSplit of the Shape inspector and
+## the Movement pane, over the one Mandelbox shape being flown through in the
+## main window. It is a window embedded in the main window (the project sets
+## embed_subwindows = true, as headless and the web always do): dragged within
+## it by its title bar, closed with its ✕, always drawn above the view. Native
+## OS sub-windows corrupted the main window's picture on macOS. A Ctrl tap in
+## this window forwards `toggle_requested`; other keys go to `unhandled_key`.
 
 signal toggle_requested
 ## A key this window's controls left unhandled (Escape, N, Cmd+S…). Showing an

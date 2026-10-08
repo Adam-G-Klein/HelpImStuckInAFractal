@@ -4,8 +4,10 @@ extends Window
 ## hands it to the editor and to the FractalView, and turns the editor's toolbar
 ## signals into graph edits and graph-only saves/loads in saves/noise/.
 ##
-## Main owns this window: it opens and closes it (the N key and the controls-panel
-## button), and reads its graph for a view save.
+## Like the console it is embedded in the main window (dragged by its title bar,
+## closed with its ✕, drawn above the view). Main owns it: it opens and closes it
+## (the N key and the pause menu's Noise editor… button), and reads its graph
+## for a view save.
 
 ## In points (logical units); UiScale.px turns them into window pixels.
 const DEFAULT_SIZE := Vector2i(1100, 700)

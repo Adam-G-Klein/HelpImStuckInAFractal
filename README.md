@@ -5,7 +5,7 @@ A from-scratch Godot 4.6 Mandelbox viewer that emulates the renderer at
 view, the four shape sliders, the thirteen colour modes, the precision control,
 Julia mode and an orbit camera. On top of the site it adds a distance-scaled
 free-fly camera, an adaptive-resolution governor that keeps the frame rate up
-while you move, and a second **console** window — a Shape inspector of every
+while you move, and a **console** window — a Shape inspector of every
 Mandelbox knob with Fractacular's binding model, and a Movement pane of virtual
 axes driven by key pairs. It is built on the **GL Compatibility** renderer
 (WebGL 2) so it is web-exportable.
@@ -27,13 +27,20 @@ binary.
 
 ## Controls
 
-Tap **Ctrl** to open the **console** (a second, native window — drag it to
-another monitor). It splits into the **Shape** inspector, with a row for every
-Mandelbox knob, and the **Movement** pane of virtual axes. Everything the
-console does not own is driven directly by the mouse and keyboard. Press
-**Escape** to pause: the pause menu offers Save view / Load view, the Camera
-mode, Fast Controls, Console and Noise editor buttons, and Resume / Settings /
-Back to Menu; Escape again steps back out.
+Tap **Ctrl** to open the **console**. It splits into the **Shape** inspector,
+with a row for every Mandelbox knob, and the **Movement** pane of virtual axes.
+Everything the console does not own is driven directly by the mouse and
+keyboard. Press **Escape** to pause: the pause menu offers Save view / Load
+view, the Camera mode, Fast Controls, Console and Noise editor buttons, and
+Resume / Settings / Back to Menu; Escape again steps back out.
+
+The console and the noise editor are windows **inside the main window**, always
+drawn above the view: drag one by its title bar, close it with its ✕, and
+enlarge or maximise the main window when you want more room for them. (They
+cannot be dragged to another monitor: separate OS windows corrupted the main
+window's picture on macOS.) An open window takes the keyboard, but the keys it
+does not use — Escape, N, a Ctrl tap, ⌘S, ⌘P — still reach the game; pausing
+tucks the windows away and resuming brings them back.
 
 **Settings** (from the title menu or the pause menu) has two tabs.
 
@@ -86,13 +93,13 @@ still frame always renders at full quality. The console's Movement pane shows
 | **Ctrl** (tap) | open the console and free the mouse; tap again to close it and recapture. Fires on release, so Ctrl+S and Ctrl+P still work |
 | **Q / E** | the default virtual **Axis A** (negative / positive). Bind a Shape row to Axis A to give Q and E that knob |
 | **N** | toggle the noise-field editor (also releases/recaptures the mouse) |
-| **Escape** | pause menu (releases the mouse; resuming recaptures it) |
+| **Escape** | pause menu (releases the mouse; resuming recaptures it). While the noise editor has the keyboard, Escape closes it first |
 | **W / A / S / D** | move forward / left / back / right |
 | **Space / Backspace** | move up / down (world-relative to the camera's own up) |
 | **Shift** (hold) | sprint — multiply the travel speed by 4 while held |
 | mouse move | mouse-look while captured (yaw about world +Z, pitch about the camera's right; no roll) |
 | mouse wheel | adjust the speed factor (×1.25 per tick up, ÷1.25 down; clamped 0.01–100) |
-| click | with the mouse free, click the view to recapture the mouse (and close the noise editor); the console stays open — that is the point of a second window |
+| click | with the mouse free, click the view to recapture the mouse (and close the noise editor); the console stays open over the view so its readouts stay in sight. A click on the console itself stays in the console |
 
 Movement speed scales with the distance to the nearest surface — roughly one
 second covers the gap to whatever you are looking at — so flight stays usable
@@ -114,7 +121,7 @@ captured in this mode.
 ### Console (Ctrl)
 
 A Ctrl tap (or the pause menu's **Console…** button) opens the console, a
-native second window split **Shape | Movement**.
+window inside the main window split **Shape | Movement**.
 
 **Shape pane.** One row per Mandelbox knob, grouped **Box** / **Julia** /
 **Iteration rotation** / **Render**:
@@ -220,8 +227,10 @@ to the **Output** node does two things to the picture, live as you edit:
 - **Tint** — the surface colour is blended toward the Output's **Tint colour** by
   the field, scaled by **Tint strength**.
 
-Opening the editor frees the mouse; a click in the view
-in Fly mode closes it and recaptures. **Orbit** mode (Camera dropdown) is the
+The editor is a window inside the main window, like the console: drag it by its
+title bar; its ✕, or N or Escape while it has the keyboard, closes it. Opening
+the editor frees the mouse; a click in the view in Fly mode closes it and
+recaptures. **Orbit** mode (Camera dropdown) is the
 comfortable way to author, since the mouse is never captured. Each node with an
 output carries a live preview — a flat slice of the field — and the toolbar's
 **Extent** and **Slice Z** choose which slice every preview shows. Right-click the

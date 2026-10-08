@@ -76,7 +76,7 @@ func _ready() -> void:
 	_build_console()
 	_build_axis_controller()
 
-	# The console and the main window are separate viewports; typing in either
+	# Each window is its own viewport, embedded or not; typing in any of them
 	# must silence WASD and the axis keys. (The noise window joins when built.)
 	fly.set_text_viewports(_focus_viewports())
 
@@ -428,7 +428,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 	# 3. click in the view in FLY mode while free: recapture, close the noise
-	# editor, and LEAVE the console open (that is the point of a second window).
+	# editor, and LEAVE the console open, so its readouts stay in sight while
+	# flying. (A click on an embedded window is that window's; it never gets here.)
 	if event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT \
 			and params.camera_mode == FractalParams.CameraMode.FLY \
