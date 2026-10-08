@@ -49,7 +49,7 @@ func run() -> void:
 	menu.queue_free()
 	await frames(1)
 
-	# --- the pause menu's controls block: Save/Load/Camera/Fast/Noise ---
+	# --- the pause menu's controls block: Save/Load/Camera/Fast/Console/Noise ---
 	# Untyped (like MainMenu above): naming PauseMenu would compile its
 	# SettingsMenu/Settings-autoload dependency at this test's own compile time.
 	var params := FractalParams.new()
@@ -60,6 +60,8 @@ func run() -> void:
 	check_eq(pause.save_button.text, "Save view…", "pause menu has a Save view button")
 	check_eq(pause.load_button.text, "Load view…", "pause menu has a Load view button")
 	check_eq(pause.noise_button.text, "Noise editor…", "pause menu has a Noise editor button")
+	check_eq(pause.console_button.text, "Console…", "pause menu has a Console button")
+	check(pause.console_button.tooltip_text.contains("Ctrl"), "whose tooltip names the Ctrl tap")
 	check(pause.camera_option.item_count == 2, "pause menu has a Camera option (Fly / Orbit)")
 	check(pause.fast_check != null, "pause menu has a Fast Controls checkbox")
 	# the camera option writes params
@@ -84,10 +86,13 @@ func run() -> void:
 	pause.save_requested.connect(func(): fired["save"] = true)
 	pause.load_requested.connect(func(): fired["load"] = true)
 	pause.noise_requested.connect(func(): fired["noise"] = true)
+	pause.console_requested.connect(func(): fired["console"] = true)
 	pause.save_button.pressed.emit()
 	pause.load_button.pressed.emit()
 	pause.noise_button.pressed.emit()
+	pause.console_button.pressed.emit()
 	check(fired.has("save") and fired.has("load") and fired.has("noise"), "Save/Load/Noise emit their signals")
+	check(fired.has("console"), "Console emits console_requested")
 	pause.queue_free()
 	await frames(1)
 
