@@ -21,6 +21,7 @@ var speed_label: Label
 var legend_label: Label
 var save_button: Button
 var load_button: Button
+var noise_button: Button
 var file_label: Label
 var status_label: Label
 
@@ -92,6 +93,11 @@ func _build() -> void:
 	box.add_child(_row("Camera", camera_option))
 
 	sens_slider = _labeled_slider(box, "Mouse sensitivity", 0.02, 0.5, 0.001)
+
+	noise_button = Button.new()
+	noise_button.text = "Noise editor…"
+	noise_button.tooltip_text = "Open the noise-field editor (also the N key): author a 3D noise field as a node graph and see it displace and tint the fractal live."
+	box.add_child(noise_button)
 
 	speed_label = Label.new()
 	box.add_child(speed_label)

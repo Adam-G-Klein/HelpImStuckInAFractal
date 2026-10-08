@@ -21,6 +21,7 @@ var _marker: JuliaMarker
 var _last_mode := -1
 var _files: WorkspaceFiles
 var _pause: PauseMenu
+var _noise: NoiseWindow
 var _loading := false
 
 
@@ -42,6 +43,7 @@ func _ready() -> void:
 
 	_build_workspace_files()
 	_build_pause_menu()
+	_build_noise_window()
 
 	# The sensitivity is the player's, not the view's: Settings owns it, and the
 	# panel's slider writes through params back into Settings.
@@ -61,6 +63,27 @@ func workspace_files() -> WorkspaceFiles:
 
 func pause_menu() -> PauseMenu:
 	return _pause
+
+
+func noise_window() -> NoiseWindow:
+	return _noise
+
+
+## The noise-field editor lives in an embedded window Main owns. Opening it frees
+## the mouse (like the Q panel); a click in the view in Fly mode closes it and the
+## panel and recaptures.
+func _build_noise_window() -> void:
+	_noise = NoiseWindow.new()
+	_noise.name = "NoiseWindow"
+	add_child(_noise)
+	_noise.setup(view)
+	_noise.close_requested.connect(_update_mouse)
+	panel.noise_button.pressed.connect(_toggle_noise)
+
+
+func _toggle_noise() -> void:
+	_noise.toggle()
+	_update_mouse()
 
 
 func _build_pause_menu() -> void:
@@ -113,7 +136,8 @@ func _build_workspace_files() -> void:
 
 
 func save_view_to(path: String) -> void:
-	var err := Workspace.save_file(path, params, camera)
+	var noise: Dictionary = _noise.to_dict() if _noise != null else {}
+	var err := Workspace.save_file(path, params, camera, noise)
 	if err != OK:
 		_report("Save failed (error %d): %s" % [err, path])
 		return
@@ -132,6 +156,12 @@ func load_view_from(path: String) -> void:
 		_report("Load failed: %s" % warnings[0])
 		return
 	_files.note_loaded(path)
+	# A file with a "noise" section replaces the field; one without leaves it alone.
+	var noise: Variant = result.get("noise", null)
+	if noise is Dictionary and _noise != null:
+		var noise_warnings := _noise.apply_dict(noise)
+		for w in noise_warnings:
+			warnings.append("noise: %s" % w)
 	# The camera moved after the mode was applied, so re-centre the orbit on it.
 	if _orbit and params.camera_mode == FractalParams.CameraMode.ORBIT:
 		_orbit.enter()
@@ -167,7 +197,8 @@ func _apply_mode() -> void:
 
 func _update_mouse() -> void:
 	var capture := params.camera_mode == FractalParams.CameraMode.FLY \
-			and not panel.visible and not _pause.visible
+			and not panel.visible and not _pause.visible \
+			and not (_noise != null and _noise.visible)
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if capture else Input.MOUSE_MODE_VISIBLE)
 
 
@@ -192,6 +223,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	# 1b. N toggles the noise editor (ignored while a panel text field has focus;
+	# the editor's own spin boxes live in its window and consume their own keys).
+	if event.is_action_pressed("toggle_noise_editor"):
+		if panel.text_field_has_focus():
+			return
+		_toggle_noise()
+		get_viewport().set_input_as_handled()
+		return
+
 	# 2. Julia marker drag, only while the mouse is free
 	if _marker and params.julia_enabled and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -213,6 +253,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			and params.camera_mode == FractalParams.CameraMode.FLY \
 			and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
 		panel.visible = false
+		if _noise != null:
+			_noise.close()
 		_update_mouse()
 		get_viewport().set_input_as_handled()
 		return

@@ -78,9 +78,11 @@ func apply_dict(d: Dictionary) -> Array:
 
 
 func open() -> void:
-	visible = true
 	_center_in_parent()
-	grab_focus()
+	visible = true
+	# Deliberately NOT grab_focus(): the main viewport keeps keyboard focus so N
+	# and Escape still reach Main. Clicking into the window focuses it for typing,
+	# and then _unhandled_key_input below closes it on N or Escape.
 
 
 func close() -> void:
@@ -92,6 +94,16 @@ func toggle() -> void:
 		close()
 	else:
 		open()
+
+
+## When the window itself holds keyboard focus (the user clicked into it), N and
+## Escape still close it. close_requested is emitted so Main recaptures the mouse.
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event.is_action_pressed(&"toggle_noise_editor") or event.is_action_pressed(&"pause"):
+		close_requested.emit()
+		set_input_as_handled()
 
 
 func _center_in_parent() -> void:

@@ -114,6 +114,50 @@ func run() -> void:
 	check_approx(main.params.mouse_sensitivity, 0.21, "in params too")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
 
+	# N opens the noise editor and frees the mouse; a click in Fly mode closes it
+	main.params.camera_mode = FractalParams.CameraMode.FLY
+	main.panel.visible = false
+	main._update_mouse()
+	await frames(1)
+	var nw = main.noise_window()
+	check(nw != null, "Main owns a NoiseWindow")
+	check(not nw.visible, "the noise editor starts closed")
+	await press_action("toggle_noise_editor")
+	check(nw.visible, "N opens the noise editor")
+	check_eq(Input.mouse_mode, Input.MOUSE_MODE_VISIBLE, "opening it frees the mouse")
+	var nclick := InputEventMouseButton.new()
+	nclick.button_index = MOUSE_BUTTON_LEFT
+	nclick.pressed = true
+	nclick.position = Vector2(400, 300)
+	main._unhandled_input(nclick)
+	check(not nw.visible, "a click in Fly mode closes the noise editor")
+	await press_action("toggle_noise_editor")
+	check(nw.visible, "N opens it again")
+	await press_action("toggle_noise_editor")
+	check(not nw.visible, "N closes it again")
+
+	# a view save carries the noise graph, and loading restores it
+	nw.editor().add_node_requested.emit(&"value_noise", Vector2(200, 200))
+	await frames(1)
+	var vn := &""
+	for id in nw.graph().nodes:
+		if nw.graph().node(id).type_id == &"value_noise":
+			vn = id
+	nw.graph().connect_ports(nw.graph().position_id(), 0, vn, 0)
+	nw.graph().connect_ports(vn, 0, nw.graph().output_id(), 0)
+	await frames(1)
+	var ntmp := "user://main_noise_view.json"
+	main.save_view_to(ntmp)
+	var ndata: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ntmp))
+	check(ndata.has("noise"), "a view save embeds the noise graph under a 'noise' key")
+	nw.editor().new_requested.emit()
+	await frames(1)
+	check_eq(nw.graph().nodes.size(), 2, "New reset the graph before the load")
+	main.load_view_from(ntmp)
+	await frames(1)
+	check_eq(nw.graph().nodes.size(), 3, "loading the view restored the noise graph")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(ntmp))
+
 	# Escape pauses and opens the pause menu; Escape again resumes
 	main.params.camera_mode = FractalParams.CameraMode.FLY
 	await frames(1)

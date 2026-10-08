@@ -91,6 +91,19 @@ func run() -> void:
 	check(not Workspace.load_file(TMP, p5, CameraState.make_default())["ok"], "another version fails")
 	check_approx(p5.scale, -2.09, "and none of them touched the params")
 
+	# --- the additive noise key round-trips, and its absence is null ---
+	var noise_dict := {"nodes": [{"id": "position_0", "type": "position"}], "links": []}
+	Workspace.save_file(TMP, params, camera, noise_dict)
+	var rn := Workspace.load_file(TMP, FractalParams.new(), CameraState.make_default())
+	check(rn["ok"] and rn["warnings"].is_empty(), "a save with a noise key loads with no warnings")
+	check(rn["noise"] is Dictionary and (rn["noise"] as Dictionary)["nodes"].size() == 1,
+		"the noise graph round-trips under 'noise'")
+	Workspace.save_file(TMP, params, camera)   # no noise
+	var rn2 := Workspace.load_file(TMP, FractalParams.new(), CameraState.make_default())
+	check(rn2["noise"] == null, "a file without a noise key reports null, so the current graph is left alone")
+	check(not FileAccess.get_file_as_string(TMP).contains("\"noise\""),
+		"…and no empty noise key is written")
+
 	# --- every committed save loads cleanly ---
 	var dir := DirAccess.open("res://saves")
 	check(dir != null, "res://saves exists")

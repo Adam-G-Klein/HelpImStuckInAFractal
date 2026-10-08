@@ -26,8 +26,10 @@ const PARAM_KEYS: Array[String] = [
 const CAMERA_MODE_NAMES: Array[String] = ["fly", "orbit"]
 
 
-## Snapshot the view. Pure: it reads, it does not change anything.
-static func capture(params: FractalParams, camera: CameraState) -> Dictionary:
+## Snapshot the view. Pure: it reads, it does not change anything. `noise` is the
+## noise graph's dict; when non-empty it is stored under an additive "noise" key,
+## which an older build simply ignores on load.
+static func capture(params: FractalParams, camera: CameraState, noise := {}) -> Dictionary:
 	var fractal := {}
 	for key in PARAM_KEYS:
 		var value: Variant = params.get(key)
@@ -36,7 +38,7 @@ static func capture(params: FractalParams, camera: CameraState) -> Dictionary:
 		elif value is Vector3:
 			value = _vec_to_array(value)
 		fractal[key] = value
-	return {
+	var out := {
 		"version": VERSION,
 		"fractal": fractal,
 		"camera": {
@@ -46,6 +48,9 @@ static func capture(params: FractalParams, camera: CameraState) -> Dictionary:
 			"speed_factor": camera.speed_factor,
 		},
 	}
+	if not noise.is_empty():
+		out["noise"] = noise
+	return out
 
 
 ## Apply a capture. Returns the warnings, one string per thing it skipped.
@@ -77,12 +82,13 @@ static func restore(data: Dictionary, params: FractalParams, camera: CameraState
 	return warnings
 
 
-## Write a capture to `path` as indented JSON.
-static func save_file(path: String, params: FractalParams, camera: CameraState) -> Error:
+## Write a capture to `path` as indented JSON. `noise`, when non-empty, is stored
+## under the "noise" key.
+static func save_file(path: String, params: FractalParams, camera: CameraState, noise := {}) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify(capture(params, camera), "\t", false))
+	file.store_string(JSON.stringify(capture(params, camera, noise), "\t", false))
 	file.close()
 	return OK
 
@@ -110,7 +116,12 @@ static func load_file(path: String, params: FractalParams, camera: CameraState) 
 	var version := int((data as Dictionary).get("version", 0))
 	if version != VERSION:
 		return _failure("Save version %d is not supported (this build reads version %d)" % [version, VERSION])
-	return {"ok": true, "warnings": restore(data, params, camera)}
+	# The noise graph is handed back raw for the caller to apply to its editor; a
+	# file without the key leaves the current graph alone (null here means "none").
+	var noise: Variant = (data as Dictionary).get("noise", null)
+	if not (noise is Dictionary):
+		noise = null
+	return {"ok": true, "warnings": restore(data, params, camera), "noise": noise}
 
 
 ## Write a graph-only noise file: {"version": VERSION, "noise": {...}}. The editor
