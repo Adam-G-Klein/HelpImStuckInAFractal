@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!--
+  Help I'm Stuck In A Fractal systems viz. Open with ./viz.sh [pane-id[/tab]] from the repo root (it always opens the
+  MAIN checkout's copy, never a frozen .claude/worktrees one). Made and extended by the /visualize
+  skill (.claude/skills/visualize/): one file per system under panes/, one <script> line per pane
+  below. The top row picks a pane, the second row one of its tabs, each tab its own canvas.
+
+  Every file:line link is a GitHub blob URL pinned to its pane's `commit`. It resolves only once
+  that commit is pushed to the remote; until then it 404s (a known, temporary state, never "fixed"
+  by repointing at an older commit whose line numbers differ). tools/viz/check.mjs verifies every
+  reference against the pinned commit.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Help I'm Stuck In A Fractal</title>
+<link rel="stylesheet" href="viz.css">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1 id="title">Help I'm Stuck In A Fractal</h1>
+    <nav id="panes"></nav>
+    <span id="hint">drag to pan · wheel to zoom · hover for detail · click to pin a tooltip · click the open tab to refit</span>
+  </div>
+  <div class="bar tabs-bar">
+    <nav id="tabs"></nav>
+    <a id="pin" target="_blank" rel="noopener"></a>
+  </div>
+</header>
+<svg id="world" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="tooltip"></div>
+<div id="errors"></div>
+
+<script src="viz.js"></script>
+<script>
+VIZ.config.title = "Help I'm Stuck In A Fractal";
+VIZ.config.repo = "https://github.com/Adam-G-Klein/HelpImStuckInAFractal";
+</script>
+
+<!-- PANES: /visualize adds one line per pane, left to right in the world. -->
+</body>
+</html>

@@ -1,0 +1,151 @@
+/* Help I'm Stuck In A Fractal systems viz — shared styles for docs/viz/index.html. Panes never add CSS: every colour a
+   pane uses is one of the six --c1..--c6 hues (light + dark), mapped to meaning by the pane's `ctx`. */
+:root {
+  color-scheme: light dark;
+  --surface: #fcfcfb;  --page: #f9f9f7;
+  --ink: #0b0b0b;      --ink-2: #52514e;  --muted: #898781;
+  --hairline: #e1e0d9; --border: rgba(11,11,11,0.10);
+  --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100; --c5: #e87ba4; --c6: #7a5af0;
+  --edge: #a8a69e;     --edge-hl: #0b0b0b;
+  --tip-bg: #ffffff;   --link: #2a78d6;
+  --pane-bg: #ffffff;
+  --fig-bg: #f3f2ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1a1a19;  --page: #0d0d0d;
+    --ink: #ffffff;      --ink-2: #c3c2b7;  --muted: #898781;
+    --hairline: #2c2c2a; --border: rgba(255,255,255,0.10);
+    --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500; --c5: #d55181; --c6: #8f74f5;
+    --edge: #6b6a64;     --edge-hl: #ffffff;
+    --tip-bg: #232322;   --link: #3987e5;
+    --pane-bg: #141413;
+    --fig-bg: #20201e;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; overflow: hidden; height: 100vh;
+  display: flex; flex-direction: column;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--page); color: var(--ink);
+}
+/* Two control rows: panes (one per system), then the open pane's tabs (one canvas each). */
+header { flex: none; border-bottom: 1px solid var(--hairline); background: var(--page); }
+.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 16px; }
+.tabs-bar { padding-top: 0; }
+h1 { font-size: 15px; font-weight: 600; margin: 0; }
+#panes, #tabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+header button {
+  font: inherit; font-size: 12px; color: var(--ink-2);
+  background: none; border: 1px solid var(--hairline); border-radius: 6px;
+  padding: 3px 10px; cursor: pointer;
+}
+header button:hover { border-color: var(--muted); color: var(--ink); }
+header button.on { color: var(--ink); border-color: var(--c1); background: var(--surface); font-weight: 600; }
+#tabs button { border-radius: 14px; padding: 4px 12px; }
+#hint { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+#pin { margin-left: auto; font-size: 11.5px; color: var(--link); text-decoration: none; white-space: nowrap; }
+#pin:hover { text-decoration: underline; }
+#world {
+  display: block; width: 100%; flex: 1; min-height: 0;
+  background: var(--surface); cursor: grab;
+  user-select: none; -webkit-user-select: none; /* drag-to-pan never selects text */
+}
+#world.panning { cursor: grabbing; }
+
+/* ── pane frame ── */
+.pane-frame { fill: var(--pane-bg); stroke: var(--hairline); stroke-width: 2; }
+.pane-title { fill: var(--ink); font-size: 30px; font-weight: 650; }
+.pane-sub { fill: var(--ink-2); font-size: 14px; }
+.legend text { fill: var(--ink-2); font-size: 12px; }
+.block-title { fill: var(--ink); font-size: 18px; font-weight: 600; }
+.block-sub { fill: var(--muted); font-size: 12.5px; }
+
+/* ── graph block ── */
+.zone rect { fill: none; stroke: var(--hairline); stroke-width: 1.5; }
+.zone text { fill: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .08em; }
+.node { cursor: pointer; }
+.node rect { fill: var(--surface); stroke-width: 1.5; }
+.node text { fill: var(--ink); font-size: 13px; pointer-events: none; }
+.node .n-sub { fill: var(--muted); font-size: 10.5px; }
+.edge { fill: none; stroke: var(--edge); stroke-width: 1.6; }
+.edge.s-dash { stroke-dasharray: 7 5; }
+.edge.s-dot { stroke-dasharray: 2 4; stroke-linecap: round; }
+.edge-label { fill: var(--muted); font-size: 10.5px; pointer-events: none; }
+.hit { fill: none; stroke: #000; stroke-opacity: 0; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+
+/* ── sequence block ── */
+.phead rect { fill: var(--surface); stroke-width: 1.5; }
+.phead .p-name { fill: var(--ink); font-size: 11.5px; font-weight: 600; }
+.phead .p-sub { fill: var(--muted); font-size: 9.5px; }
+.lifeline { stroke: var(--edge); stroke-width: 1.3; }
+.act { stroke-width: 1.4; fill: var(--surface); cursor: pointer; }
+.msg { fill: none; stroke: var(--edge); stroke-width: 1.7; }
+.msg.s-dash { stroke-dasharray: 7 5; }
+.msg-label { fill: var(--ink-2); font-size: 11px; pointer-events: none; }
+.msg-tick { fill: var(--muted); font-size: 10px; font-weight: 600; pointer-events: none; }
+.seq-sec text { fill: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; }
+.seq-sec line { stroke: var(--hairline); stroke-width: 1; }
+.frag rect { fill: none; stroke: var(--border); stroke-width: 1.2; }
+.frag .frag-tabbg { fill: var(--surface); stroke: var(--border); stroke-width: 1; }
+.frag .frag-tab { fill: var(--muted); font-size: 10.5px; font-weight: 700; letter-spacing: .04em; }
+.frag .frag-guard { fill: var(--ink-2); font-size: 10.5px; font-style: italic; }
+.frag .frag-div { stroke: var(--border); stroke-width: 1; stroke-dasharray: 5 4; }
+.seq-boundary line { stroke: var(--c2); stroke-width: 1.3; stroke-dasharray: 3 5; opacity: .6; }
+.seq-boundary text { fill: var(--c2); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+
+/* ── cards block ── */
+.card rect { fill: var(--surface); stroke: var(--hairline); stroke-width: 1.5; }
+.card .c-title { fill: var(--ink); font-size: 13.5px; font-weight: 600; }
+.card .c-tag { font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.card .c-body { fill: var(--ink-2); font-size: 12px; }
+.card a text, .vlink text { fill: var(--link); font-size: 12px; cursor: pointer; }
+.card a:hover text, .vlink:hover text { text-decoration: underline; }
+
+/* ── table block ── */
+.tbl .th { fill: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+.tbl .td { fill: var(--ink); font-size: 12.5px; }
+.tbl .td.mono, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+.tbl .row-bg { fill: transparent; }
+.tbl .row-bg.zebra { fill: var(--fig-bg); }
+.tbl .row-hit { fill: transparent; cursor: pointer; }
+.tbl line { stroke: var(--hairline); }
+
+/* ── figure block (custom drawings and live widgets) ── */
+.fig-bg { fill: var(--fig-bg); stroke: var(--hairline); stroke-width: 1; }
+.fig text { fill: var(--ink-2); font-size: 12px; }
+.fig .ink { fill: var(--ink); }
+.fig .muted { fill: var(--muted); }
+.vbtn rect { fill: var(--surface); stroke: var(--hairline); stroke-width: 1.2; cursor: pointer; }
+.vbtn:hover rect { stroke: var(--muted); }
+.vbtn.on rect { stroke: var(--c1); stroke-width: 2; }
+.vbtn text { fill: var(--ink); font-size: 12px; pointer-events: none; }
+.vslider .track { stroke: var(--hairline); stroke-width: 4; stroke-linecap: round; }
+.vslider .fill { stroke: var(--c1); stroke-width: 4; stroke-linecap: round; }
+.vslider .knob { fill: var(--surface); stroke: var(--c1); stroke-width: 2; cursor: ew-resize; }
+.vslider text { fill: var(--ink-2); font-size: 11.5px; }
+.vslider .val { fill: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
+
+/* ── hover dimming, scoped to the hovered block ── */
+.block.hovering .dim { opacity: .2; transition: opacity .08s; }
+.block.hovering .dim.hl { opacity: 1; }
+.block.hovering .edge.hl, .block.hovering .msg.hl { stroke: var(--edge-hl); stroke-width: 2.4; }
+.block.hovering .zone, .block.hovering .frag, .block.hovering .seq-sec { opacity: .45; }
+
+#tooltip {
+  position: fixed; display: none; z-index: 10; max-width: 420px;
+  background: var(--tip-bg); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  padding: 10px 12px; font-size: 12.5px; line-height: 1.45;
+}
+#tooltip .t-title { font-weight: 600; font-size: 13px; }
+#tooltip .t-sub { color: var(--muted); font-size: 11.5px; margin: 2px 0 6px; }
+#tooltip .t-blurb { color: var(--ink-2); margin-bottom: 7px; white-space: pre-line; }
+#tooltip .t-links a { display: block; color: var(--link); font-size: 12px; }
+#tooltip code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; }
+#errors {
+  position: fixed; left: 12px; bottom: 12px; z-index: 11; display: none; max-width: 640px;
+  background: #c43a30; color: #fff; border-radius: 8px; padding: 8px 12px;
+  font: 12px ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap;
+}

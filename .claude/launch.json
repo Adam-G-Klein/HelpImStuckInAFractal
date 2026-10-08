@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "viz",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec python3 -m http.server \"${PORT:-8765}\" --bind 127.0.0.1 --directory docs/viz"],
+      "port": 8765,
+      "autoPort": true
+    }
+  ]
+}

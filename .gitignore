@@ -28,3 +28,6 @@ mono_crash.*.json
 build/
 tests/out/
 screenshots/
+
+# Claude Code per-user settings
+.claude/settings.local.json
