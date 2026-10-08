@@ -292,25 +292,10 @@ func _save_new_and_reload() -> void:
 	check(not nw.visible, "N closes the noise window")
 
 	var dialog := await _use_view_panel(true)
-	# BUG: Save view… and Load view… are pressed in the pause menu, so the tree is
-	# paused when WorkspaceFiles opens its FileDialog. The dialog is a child of
-	# Main (process_mode INHERIT), so it cannot process while paused: its file
-	# field takes focus but ignores every key, and neither Enter nor its buttons
-	# do anything. Unpausing makes the same input work. The macOS build hides
-	# this behind the native panel (use_native_dialog), but wherever Godot's own
-	# panel is used (the web build, or any platform without a native file
-	# dialog) the pause menu's Save view… / Load view… panels are frozen.
-	var wrote := FileAccess.file_exists(SAVE)
-	known_bug(wrote,
-		"typing a name into the Save view… panel and Enter writes user://ui_journey.json",
-		"the embedded file panel opened from the pause menu is paused with the tree and ignores input")
-	if not wrote:
-		# Fall back to the panel's own signal (as main_test.gd does) so the rest
-		# of the journey runs.
-		dialog.file_selected.emit(ProjectSettings.globalize_path(SAVE))
-		await ui.frames(1)
-		dialog.hide()
-	check(FileAccess.file_exists(SAVE), "the view is saved")
+	# The panel opens while the pause menu has the tree paused; it keeps
+	# processing (WorkspaceFiles runs PROCESS_MODE_ALWAYS), so it takes the keys.
+	check(not dialog.visible, "typing a name into the Save view… panel and Enter closes it")
+	check(FileAccess.file_exists(SAVE), "and writes user://ui_journey.json")
 	var pause = main.pause_menu()
 	check_eq(pause.file_label.text, SAVE.get_file(), "the pause menu names the saved file")
 	if pause.visible:
@@ -335,15 +320,7 @@ func _save_new_and_reload() -> void:
 	check(main.camera.eye().distance_to(saved_eye) > 1e-4, "the camera moved away since the save")
 
 	var load_dialog := await _use_view_panel(false)
-	var loaded := not load_dialog.visible and is_equal_approx(float(main.table().get_default(&"box_scale")), -1.5)
-	# BUG: the same paused-panel defect as Save view… above.
-	known_bug(loaded,
-		"typing the name into the Load view… panel and Enter loads it",
-		"the embedded file panel opened from the pause menu is paused with the tree and ignores input")
-	if not loaded:
-		load_dialog.file_selected.emit(ProjectSettings.globalize_path(SAVE))
-		await ui.frames(1)
-		load_dialog.hide()
+	check(not load_dialog.visible, "typing the name into the Load view… panel and Enter loads it and closes the panel")
 	await ui.frames(2)
 	check_approx(float(main.table().get_default(&"box_scale")), -1.5, "loading restores the shape (Scale -1.5)")
 	var b: Binding = main.table().binding(&"fold_limit")

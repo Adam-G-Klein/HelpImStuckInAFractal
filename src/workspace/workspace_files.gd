@@ -2,7 +2,7 @@ class_name WorkspaceFiles
 extends Node
 ## Which file a view is saved to or loaded from, and which one is current.
 ##
-## It owns the two native file panels and the current file's path, and nothing
+## It owns the two file panels and the current file's path, and nothing
 ## else: it never reads a save, never writes one, and knows nothing about the
 ## fractal, the camera or the JSON format. Picking a file emits `save_to` or
 ## `load_from`; whoever does the work calls `note_saved` or `note_loaded` if it
@@ -53,6 +53,13 @@ static func ensure_directory() -> Error:
 	if DirAccess.dir_exists_absolute(absolute):
 		return OK
 	return DirAccess.make_dir_recursive_absolute(absolute)
+
+
+## The pause menu opens these panels while the tree is paused. Godot's own
+## panel (embedded, and on the web) is a child of this node, so it must keep
+## processing or it ignores every key and click.
+func _init() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
 func _ready() -> void:

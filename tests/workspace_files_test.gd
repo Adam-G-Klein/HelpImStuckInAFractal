@@ -27,6 +27,12 @@ func run() -> void:
 	var load_dialog := files.load_dialog()
 	check_eq(save_dialog.file_mode, FileDialog.FILE_MODE_SAVE_FILE, "one panel saves")
 	check_eq(load_dialog.file_mode, FileDialog.FILE_MODE_OPEN_FILE, "the other opens")
+	# the pause menu opens them with the tree paused; Godot's own panel must still
+	# take keys and clicks then
+	paused = true
+	check(save_dialog.can_process() and load_dialog.can_process(),
+		"both panels keep processing while the tree is paused")
+	paused = false
 	check(save_dialog.use_native_dialog and load_dialog.use_native_dialog,
 		"both ask for the native panel")
 	check_eq(save_dialog.access, FileDialog.ACCESS_FILESYSTEM,
