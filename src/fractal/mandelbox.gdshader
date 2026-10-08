@@ -2,6 +2,12 @@ shader_type canvas_item;
 // Mandelbox raymarcher. Written from the design spec's algorithm; nothing is
 // copied from icefractal.com. All float math is highp (WebGL 2 => float32),
 // which is Godot's canvas_item default.
+//
+// One Mandelbox iteration (mb_step) runs for both de() and field(): box fold,
+// sphere fold, optional per-iteration 4D rotation, scale and add. Each shape
+// uniform is named exactly as its catalogue id (src/fractal/mandelbox_shape.gd),
+// so the uniform set equals MandelboxShape.catalogue_ids() plus the renderer's
+// own camera uniforms.
 
 uniform vec3 eye;
 uniform vec3 cam_right;
@@ -9,15 +15,35 @@ uniform vec3 cam_up;
 uniform vec3 cam_forward;
 uniform float tan_half_fov;
 uniform float aspect;
-uniform float scale;
-uniform float min_r2;
-uniform float fixed_r2;
-uniform float fold_limit;
-uniform float precision;
-uniform int color_mode;
-uniform bool julia_enabled;
-uniform vec3 julia_point;
 uniform float box_half;
+
+// --- shape uniforms (names == catalogue ids) ---
+uniform float box_scale;
+uniform float fold_limit;
+uniform float min_radius;
+uniform float fixed_radius;
+uniform int fold_order;       // 0 box -> sphere, 1 sphere -> box
+uniform float w;              // the sample point's fourth coordinate
+
+uniform bool julia_all;
+uniform bool julia_0;
+uniform bool julia_1;
+uniform bool julia_2;
+uniform bool julia_3;
+uniform float c_0;
+uniform float c_1;
+uniform float c_2;
+uniform float c_3;
+
+uniform float iter_rot_xy;
+uniform float iter_rot_xz;
+uniform float iter_rot_xw;
+uniform float iter_rot_yz;
+uniform float iter_rot_yw;
+uniform float iter_rot_zw;
+
+uniform int color_mode;
+uniform float precision;
 
 // NOISE:BEGIN
 float noise_displace(vec3 p) { return 0.0; }
@@ -25,45 +51,106 @@ float noise_step_scale() { return 1.0; }
 vec3 noise_tint(vec3 col, vec3 p) { return col; }
 // NOISE:END
 
+// Reflect every component that leaves [-L, L] back inside.
+vec4 mb_box_fold(vec4 p) {
+	return clamp(p, -fold_limit, fold_limit) * 2.0 - p;
+}
+
+// Inflate the inner sphere, invert the shell between the two radii, and carry
+// the same factor into the running derivative.
+void mb_sphere_fold(inout vec4 p, inout float dr) {
+	float r2 = dot(p, p);
+	float mr2 = max(min_radius * min_radius, 1e-12);
+	float fr2 = max(fixed_radius * fixed_radius, 1e-12);
+	if (r2 < mr2) {
+		float f = fr2 / mr2;
+		p *= f;
+		dr *= f;
+	} else if (r2 < fr2) {
+		float f = fr2 / max(r2, 1e-12);
+		p *= f;
+		dr *= f;
+	}
+}
+
+vec4 mb_axis(int i) {
+	if (i == 0) return vec4(1.0, 0.0, 0.0, 0.0);
+	if (i == 1) return vec4(0.0, 1.0, 0.0, 0.0);
+	if (i == 2) return vec4(0.0, 0.0, 1.0, 0.0);
+	return vec4(0.0, 0.0, 0.0, 1.0);
+}
+
+// Rotate p in the (a, b) plane by `deg` degrees:
+//   a' = a cos - b sin,  b' = a sin + b cos.
+vec4 mb_rot_plane(vec4 p, int a, int b, float deg) {
+	float r = radians(deg);
+	float c = cos(r);
+	float s = sin(r);
+	vec4 ea = mb_axis(a);
+	vec4 eb = mb_axis(b);
+	float pa = dot(p, ea);
+	float pb = dot(p, eb);
+	return p - pa * ea - pb * eb + (pa * c - pb * s) * ea + (pa * s + pb * c) * eb;
+}
+
+// The six per-iteration angles, fixed order xy, xz, xw, yz, yw, zw.
+vec4 mb_iter_rotate(vec4 p) {
+	p = mb_rot_plane(p, 0, 1, iter_rot_xy);
+	p = mb_rot_plane(p, 0, 2, iter_rot_xz);
+	p = mb_rot_plane(p, 0, 3, iter_rot_xw);
+	p = mb_rot_plane(p, 1, 2, iter_rot_yz);
+	p = mb_rot_plane(p, 1, 3, iter_rot_yw);
+	p = mb_rot_plane(p, 2, 3, iter_rot_zw);
+	return p;
+}
+
+bool mb_rotating() {
+	return (abs(iter_rot_xy) + abs(iter_rot_xz) + abs(iter_rot_xw)
+		+ abs(iter_rot_yz) + abs(iter_rot_yw) + abs(iter_rot_zw)) > 1e-6;
+}
+
+// One Mandelbox iteration on the 4D orbit point z with running derivative dz.
+void mb_step(inout vec4 z, inout float dz, vec4 c, bool rotating) {
+	if (fold_order == 0) { z = mb_box_fold(z); mb_sphere_fold(z, dz); }
+	else                 { mb_sphere_fold(z, dz); z = mb_box_fold(z); }
+	if (rotating) { z = mb_iter_rotate(z); }
+	z = box_scale * z + c;
+	dz = dz * abs(box_scale) + 1.0;
+}
+
+// Per component: the Julia constant where it is checked, the point's own
+// coordinate where it is not.
+vec4 mb_constant(vec4 z0) {
+	return vec4(
+		(julia_all || julia_0) ? c_0 : z0.x,
+		(julia_all || julia_1) ? c_1 : z0.y,
+		(julia_all || julia_2) ? c_2 : z0.z,
+		(julia_all || julia_3) ? c_3 : z0.w);
+}
+
 // Mandelbox distance estimate, up to `iters` iterations (<= 32).
 float de(vec3 p, int iters) {
-	vec3 c = julia_enabled ? julia_point : p;
-	vec3 z = p;
+	vec4 z0 = vec4(p, w);
+	vec4 c = mb_constant(z0);
+	vec4 z = z0;
 	float dz = 1.0;
+	bool rotating = mb_rotating();
 	for (int i = 0; i < 32; i++) {
 		if (i >= iters) { break; }
-		z = clamp(z, -fold_limit, fold_limit) * 2.0 - z;
-		float r2 = dot(z, z);
-		float k = 1.0;
-		if (r2 < min_r2) {
-			k = fixed_r2 / min_r2;
-		} else if (r2 < fixed_r2) {
-			k = fixed_r2 / r2;
-		}
-		z *= k;
-		dz *= k;
-		z = scale * z + c;
-		dz = -dz * scale + 1.0;
+		mb_step(z, dz, c, rotating);
 	}
 	return length(z) / abs(dz) + noise_displace(p);
 }
 
-// The "Ice Fractal" field: a 16-iteration Mandelbox orbit from z=0, c=q, no
-// derivative, offset by -8. Not a true distance; its gradient gives the look.
+// The "Ice Fractal" field: a 16-iteration Mandelbox orbit from z=0, c=(q, w),
+// no derivative, offset by -8. Not a true distance; its gradient gives the look.
 float field(vec3 q) {
-	vec3 z = vec3(0.0);
-	vec3 c = q;
+	vec4 z = vec4(0.0);
+	vec4 c = vec4(q, w);
+	float dz = 1.0;
+	bool rotating = mb_rotating();
 	for (int i = 0; i < 16; i++) {
-		z = clamp(z, -fold_limit, fold_limit) * 2.0 - z;
-		float r2 = dot(z, z);
-		float k = 1.0;
-		if (r2 < min_r2) {
-			k = fixed_r2 / min_r2;
-		} else if (r2 < fixed_r2) {
-			k = fixed_r2 / r2;
-		}
-		z *= k;
-		z = scale * z + c;
+		mb_step(z, dz, c, rotating);
 	}
 	return length(z) - 8.0 + noise_displace(q);
 }
@@ -172,7 +259,7 @@ void fragment() {
 
 			// Normal: NF for modes 1..9 outside Julia mode, N otherwise.
 			vec3 n;
-			if (color_mode >= 1 && color_mode <= 9 && !julia_enabled) {
+			if (color_mode >= 1 && color_mode <= 9 && !julia_all) {
 				n = calc_nf(v, h);
 			} else {
 				n = calc_normal(v, delta);

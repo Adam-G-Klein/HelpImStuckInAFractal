@@ -8,20 +8,21 @@ func run() -> void:
 	root.add_child(view)
 	view.size = Vector2(1280, 800)
 	view.setup(params, cam)
+	var table := AttributeTable.new(MandelboxShape.specs())
 	var marker := JuliaMarker.new()
 	root.add_child(marker)
 	marker.size = Vector2(1280, 800)
-	marker.setup(params, cam, view)
+	marker.setup(params, cam, view, table)
 	await frames(1)
 
 	# hidden unless Julia is on
 	check(not marker.visible, "marker hidden while Julia is off")
-	params.julia_enabled = true
+	params.julia_all = true
 	await frames(1)
 	check(marker.visible, "marker shows when Julia is on")
 
 	# the ring sits at project(julia_point)
-	var expected: Variant = view.project(params.julia_point)
+	var expected: Variant = view.project(params.julia_point())
 	var got: Variant = marker.screen_point()
 	check(expected != null and got != null and (got as Vector2).is_equal_approx(expected),
 		"ring is drawn at the projected Julia point")
@@ -33,7 +34,9 @@ func run() -> void:
 		var target := (got as Vector2) + Vector2(40, -25)
 		marker.update_drag(target)
 		await frames(1)
-		var reproj: Variant = view.project(params.julia_point)
+		check_approx(table.get_default(&"c_0"), params.julia_point().x,
+			"the drag wrote c_0 into the table")
+		var reproj: Variant = view.project(params.julia_point())
 		check(reproj != null and (reproj as Vector2).distance_to(target) < 2.0,
 			"after the drag the point reprojects to the cursor")
 

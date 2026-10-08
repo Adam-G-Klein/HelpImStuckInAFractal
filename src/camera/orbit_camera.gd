@@ -152,7 +152,7 @@ func _look_from(eye: Vector3) -> void:
 
 ## Single-phase high-precision CPU march. Returns the hit Vector3 or null.
 func _march(ro: Vector3, rd: Vector3) -> Variant:
-	var box_half := 20.0 if _params.julia_enabled else 2.0
+	var box_half := 20.0 if _params.julia_enabled() else 2.0
 	var tb := _box(ro, rd, box_half)
 	if tb.y < maxf(tb.x, 0.0):
 		return null
