@@ -19,19 +19,27 @@ GDScript only — no C#, even though the Godot build on disk is the Mono build.
 
 `run.sh` finds `godot4` on your `PATH` (or falls back to `Godot_mono.app` /
 `Godot.app`), refreshes Godot's script-class cache when a script has changed,
-and then launches the main scene. Set `GODOT=/path/to/godot` to use a different
+and then launches the main scene: the **Icebox Nav** title menu (Play Game,
+Settings, Quit; Quit is hidden in a web build). Set `GODOT=/path/to/godot` to use a different
 binary.
 
 ## Controls
 
 Press **Q** to open the controls panel. Everything the panel does not own is
-driven directly by the mouse and keyboard.
+driven directly by the mouse and keyboard. Press **Escape** to pause: the pause
+menu offers Resume, Settings and Back to Menu, and Escape again steps back out.
+
+**Settings** (from the title menu or the pause menu) holds the mouse
+sensitivity. It is the player's preference, not part of a view: it is kept in
+`user://settings.cfg`, survives restarts, and loading a saved view does not
+change it.
 
 ### Fly camera (default)
 
 | key / action | what it does |
 |---|---|
 | **Q** | toggle the controls panel (also releases/recaptures the mouse) |
+| **Escape** | pause menu (releases the mouse; resuming recaptures it) |
 | **W / A / S / D** | move forward / left / back / right |
 | **Space / Shift** | move up / down (world-relative to the camera's own up) |
 | mouse move | mouse-look while captured (yaw about world +Z, pitch about the camera's right; no roll) |
@@ -67,7 +75,7 @@ captured in this mode.
 | **Julia** | toggle Julia mode; the X/Y/Z fields set the Julia point, which also has a draggable on-screen marker |
 | **Fast Controls** | let the resolution governor drop render scale while you interact |
 | **Camera** | Fly or Orbit |
-| **Mouse sensitivity** | look / orbit speed |
+| **Mouse sensitivity** | look / orbit speed (the same setting as in Settings) |
 
 **⌘S** (Ctrl+S elsewhere) saves over the current file without a panel; with
 no current file it opens the Save panel. The line under the buttons reports

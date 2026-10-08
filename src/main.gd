@@ -3,7 +3,10 @@ extends Node
 ## Wires the two resources into every child, selects the active camera from
 ## camera_mode, owns the mouse capture, and is the single mouse-event dispatcher.
 ## Also saves and loads views: WorkspaceFiles picks the file, Workspace does the
-## reading and writing, and the panel shows the result.
+## reading and writing, and the panel shows the result. Escape pauses the tree
+## and opens the PauseMenu; the mouse sensitivity follows the Settings autoload.
+
+const MENU_SCENE := "res://src/ui/main_menu.tscn"
 
 var params: FractalParams
 var camera: CameraState
@@ -17,6 +20,8 @@ var _orbit: OrbitCamera
 var _marker: JuliaMarker
 var _last_mode := -1
 var _files: WorkspaceFiles
+var _pause: PauseMenu
+var _loading := false
 
 
 func _ready() -> void:
@@ -36,6 +41,13 @@ func _ready() -> void:
 		_marker.setup(params, camera, view)
 
 	_build_workspace_files()
+	_build_pause_menu()
+
+	# The sensitivity is the player's, not the view's: Settings owns it, and the
+	# panel's slider writes through params back into Settings.
+	params.mouse_sensitivity = Settings.mouse_sensitivity
+	Settings.changed.connect(func(): params.mouse_sensitivity = Settings.mouse_sensitivity)
+	params.changed.connect(_sync_sensitivity_to_settings)
 
 	panel.visible = false
 	params.changed.connect(_apply_mode)
@@ -45,6 +57,40 @@ func _ready() -> void:
 
 func workspace_files() -> WorkspaceFiles:
 	return _files
+
+
+func pause_menu() -> PauseMenu:
+	return _pause
+
+
+func _build_pause_menu() -> void:
+	_pause = PauseMenu.new()
+	_pause.name = "PauseMenu"
+	add_child(_pause)
+	_pause.resume_requested.connect(resume)
+	_pause.menu_requested.connect(back_to_menu)
+
+
+func pause() -> void:
+	get_tree().paused = true
+	_pause.open()
+	_update_mouse()
+
+
+func resume() -> void:
+	_pause.close()
+	get_tree().paused = false
+	_update_mouse()
+
+
+func back_to_menu() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file(MENU_SCENE)
+
+
+func _sync_sensitivity_to_settings() -> void:
+	if not _loading:
+		Settings.mouse_sensitivity = params.mouse_sensitivity
 
 
 ## The buttons and the quick-save key only choose a file; the saving and
@@ -76,7 +122,11 @@ func save_view_to(path: String) -> void:
 
 
 func load_view_from(path: String) -> void:
+	# A saved view carries a sensitivity too, but the player's setting wins.
+	_loading = true
 	var result := Workspace.load_file(path, params, camera)
+	_loading = false
+	params.mouse_sensitivity = Settings.mouse_sensitivity
 	var warnings: Array = result["warnings"]
 	if not result["ok"]:
 		_report("Load failed: %s" % warnings[0])
@@ -116,7 +166,8 @@ func _apply_mode() -> void:
 
 
 func _update_mouse() -> void:
-	var capture := (params.camera_mode == FractalParams.CameraMode.FLY) and not panel.visible
+	var capture := params.camera_mode == FractalParams.CameraMode.FLY \
+			and not panel.visible and not _pause.visible
 	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED if capture else Input.MOUSE_MODE_VISIBLE)
 
 
@@ -124,8 +175,14 @@ func _active_camera() -> Node:
 	return fly if params.camera_mode == FractalParams.CameraMode.FLY else _orbit
 
 
-# The only mouse dispatcher: Q -> JuliaMarker -> active camera.
+# The only mouse dispatcher: Escape -> Q -> JuliaMarker -> active camera.
+# (Paused, this does not run; the PauseMenu takes Escape instead.)
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("pause"):
+		pause()
+		get_viewport().set_input_as_handled()
+		return
+
 	# 1. Q toggles the panel (ignored while a panel text field has focus)
 	if event.is_action_pressed("toggle_panel"):
 		if panel.text_field_has_focus():
