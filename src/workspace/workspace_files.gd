@@ -31,6 +31,10 @@ var subdir := ""
 ## instances never both fire on one key press.
 var quick_save_enabled := true
 
+## The file-dialog filter. The view and noise editor keep the default; the
+## console's Movement pane narrows it to keymap files.
+var file_filter := FILTER
+
 var _save_dialog: FileDialog
 var _load_dialog: FileDialog
 
@@ -124,7 +128,7 @@ func _make_dialog(mode: FileDialog.FileMode, title: String) -> FileDialog:
 	# modes fall back to Godot's own dialog.
 	dialog.access = FileDialog.ACCESS_FILESYSTEM
 	dialog.use_native_dialog = true
-	dialog.filters = PackedStringArray([FILTER])
+	dialog.filters = PackedStringArray([file_filter])
 	add_child(dialog)
 	return dialog
 
