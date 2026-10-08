@@ -26,6 +26,10 @@ func _ready() -> void:
 	_display.texture = _viewport.get_texture()
 	_display.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_display.stretch_mode = TextureRect.STRETCH_SCALE
+	# The view covers the window, so if it took mouse events the GUI would eat
+	# every click and every captured mouse-look motion before Main saw them.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	resized.connect(_apply_size)
 	_apply_size()
