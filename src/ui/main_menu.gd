@@ -4,6 +4,8 @@ extends Control
 ## swaps the list for the shared SettingsMenu. Play loads the explorer.
 
 const GAME_SCENE := "res://src/main.tscn"
+## The main window's size in points (logical units); see UiScale.
+const WINDOW_SIZE := Vector2i(1280, 800)
 
 var play_button: Button
 var settings_button: Button
@@ -14,6 +16,9 @@ var _list: VBoxContainer
 
 
 func _ready() -> void:
+	# The game starts here, so this is where a HiDPI screen first gets its scale.
+	UiScale.apply(get_window())
+	UiScale.fit_main_window(get_window(), WINDOW_SIZE)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 

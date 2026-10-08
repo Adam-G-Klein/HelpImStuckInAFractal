@@ -1,6 +1,8 @@
 extends "res://tests/test_case.gd"
 ## project/unproject round-trip, render-scale sizing, and that the view's shader
-## material carries the compiled shader.
+## material carries the compiled shader. A resize requests a frame (it used to
+## leave the view black), and the SubViewport is sized in physical pixels: the
+## logical size times the window's content scale.
 
 
 func run() -> void:
@@ -42,6 +44,19 @@ func run() -> void:
 	await frames(1)
 	check_eq(view.viewport_size(), Vector2i(1280, 800), "render_scale clamps to 1.0")
 
+	# a resize after the frame was drawn requests a new one (the black-view bug)
+	await frames(2)
+	var sub: SubViewport = view._viewport
+	sub.render_target_update_mode = SubViewport.UPDATE_DISABLED   # the frame was consumed
+	view.size = Vector2(1000, 700)
+	check_eq(view.viewport_size(), Vector2i(1000, 700), "the SubViewport follows the resize")
+	check_eq(sub.render_target_update_mode, SubViewport.UPDATE_ONCE, "a resize requests a frame")
+	sub.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	view.size = Vector2(1000, 700)
+	check_eq(sub.render_target_update_mode, SubViewport.UPDATE_DISABLED, "the same size does not")
+	view.size = Vector2(1280, 800)
+	await frames(1)
+
 	# the load-shed level pushes fog, cheaper detail and a smaller step budget;
 	# level 0 pushes exactly the view's own values
 	var mat := view._material
@@ -70,4 +85,32 @@ func run() -> void:
 	check_eq(int(mat.get_shader_parameter("coarse_steps")), base_coarse, "and the original budget")
 
 	view.queue_free()
+	await frames(1)
+
+	# in a window with content scale 2 the SubViewport renders physical pixels;
+	# project/unproject stay in the view's logical units
+	var win := Window.new()
+	win.size = Vector2i(1600, 1200)
+	win.content_scale_factor = 2.0
+	root.add_child(win)
+	var hi: FractalView = load("res://src/fractal/fractal_view.tscn").instantiate()
+	win.add_child(hi)
+	await frames(1)
+	hi.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	hi.size = Vector2(400, 300)
+	hi.setup(params, cam)
+	await frames(1)
+	check_eq(hi.viewport_size(), Vector2i(800, 600), "at content scale 2 the viewport is twice the logical size")
+	hi.set_render_scale(0.5)
+	check_eq(hi.viewport_size(), Vector2i(400, 300), "and render scale is still a fraction of that")
+	hi.set_render_scale(1.0)
+	var hpx: Variant = hi.project(Vector3(0.5, 0.2, 0.1))
+	check(hpx != null and Rect2(Vector2.ZERO, hi.size).has_point(hpx), "project() answers in logical units")
+	var hsub: SubViewport = hi._viewport
+	hsub.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	win.content_scale_factor = 3.0
+	await frames(1)
+	check_eq(hi.viewport_size(), Vector2i(1200, 900), "a content scale change resizes the viewport")
+	check_eq(hsub.render_target_update_mode, SubViewport.UPDATE_ONCE, "and requests a frame")
+	win.queue_free()
 	await frames(1)

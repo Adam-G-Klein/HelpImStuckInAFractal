@@ -176,6 +176,17 @@ func run() -> void:
 	nw.close()
 	main._update_mouse()
 
+	# the pause menu's Console button opens the console, keeps the mouse free and
+	# resumes (the way in when a browser swallows the Ctrl tap)
+	check(main.is_mouse_captured() and not console.visible, "flying, console closed")
+	main.pause()
+	pause.console_button.pressed.emit()
+	check(console.visible, "the pause Console button opens the console")
+	check(not paused and not pause.visible, "and resumes")
+	check(not main.is_mouse_captured(), "with the mouse left free to use it")
+	_tap_ctrl(main)
+	check(not console.visible and main.is_mouse_captured(), "a Ctrl tap then closes it and recaptures")
+
 	# a view save carries the noise graph, and loading restores it
 	nw.editor().add_node_requested.emit(&"value_noise", Vector2(200, 200))
 	await frames(1)

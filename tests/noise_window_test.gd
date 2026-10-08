@@ -28,8 +28,11 @@ func run() -> void:
 	check(window.editor() != null and not window.editor().is_empty(), "the editor shows it")
 
 	# --- open and close ---
+	check_eq(window.size, UiScale.px(NoiseWindow.DEFAULT_SIZE, window), "the window is sized by UiScale")
+	check_approx(window.content_scale_factor, UiScale.factor_for(window), "and takes its content scale")
 	window.open()
 	check(window.visible, "open() shows it")
+	check(window.position.y >= 0, "it opens inside the main window, title bar reachable")
 	window.close()
 	check(not window.visible, "close() hides it")
 	window.toggle()

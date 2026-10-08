@@ -1,40 +1,48 @@
 class_name NoiseNodeRegistry
 extends RefCounted
-## Every noise node type, found by SCANNING src/noise/nodes rather than by
-## holding a list of scripts. Adding a node type means dropping `<id>.gd` in that
-## directory — no edit here.
+## Every noise node type, from a list of preloaded scripts: one per file in
+## src/noise/nodes. Adding a node type means dropping `<id>.gd` in that directory
+## AND adding it to NODE_SCRIPTS (kept in file-name order).
 ##
-## The cost: DirAccess cannot enumerate a .pck, so this only works while the
-## project is RUN FROM SOURCE, which is how it is run (run.sh, `--path .`). An
-## export build would need the hard-coded list back — the same caveat as
-## Fractacular's registry.
+## It used to scan the directory instead, which only works when the project is
+## run from source: an exported .pck holds compiled .gdc files, so the web build
+## found no nodes at all. noise_registry_test.gd lists the directory (which works
+## from source) and fails if a file is missing here, so a new node still cannot
+## be forgotten silently.
 
 const NODE_DIR := "res://src/noise/nodes"
+
+const NODE_SCRIPTS: Array[GDScript] = [
+	preload("res://src/noise/nodes/cellular.gd"),
+	preload("res://src/noise/nodes/clamp.gd"),
+	preload("res://src/noise/nodes/combine_xyz.gd"),
+	preload("res://src/noise/nodes/constant.gd"),
+	preload("res://src/noise/nodes/gradient_noise.gd"),
+	preload("res://src/noise/nodes/length.gd"),
+	preload("res://src/noise/nodes/math.gd"),
+	preload("res://src/noise/nodes/mix.gd"),
+	preload("res://src/noise/nodes/output.gd"),
+	preload("res://src/noise/nodes/position.gd"),
+	preload("res://src/noise/nodes/remap.gd"),
+	preload("res://src/noise/nodes/split_xyz.gd"),
+	preload("res://src/noise/nodes/transform.gd"),
+	preload("res://src/noise/nodes/value_noise.gd"),
+	preload("res://src/noise/nodes/warp.gd"),
+]
 
 
 ## Fresh instances, sorted by (order, title). Fresh, not cached: instancing a
 ## dozen RefCounteds is free and two editors sharing one instance is a subtle bug.
 static func all() -> Array[NoiseNodeType]:
 	var out: Array[NoiseNodeType] = []
-	var dir := DirAccess.open(NODE_DIR)
-	if dir == null:
-		push_warning("NoiseNodeRegistry: cannot open %s" % NODE_DIR)
-		return out
-	var names := dir.get_files()
-	names.sort()
-	for file_name in names:
-		if not file_name.ends_with(".gd"):
-			continue
-		var script: Variant = load("%s/%s" % [NODE_DIR, file_name])
-		if not (script is GDScript):
-			continue
-		var instance: Variant = (script as GDScript).new()
+	for script in NODE_SCRIPTS:
+		var instance: Variant = script.new()
 		if not (instance is NoiseNodeType):
-			push_warning("NoiseNodeRegistry: %s is not a NoiseNodeType" % file_name)
+			push_warning("NoiseNodeRegistry: %s is not a NoiseNodeType" % script.resource_path)
 			continue
 		var type: NoiseNodeType = instance
 		if type.id == &"":
-			push_warning("NoiseNodeRegistry: %s has no id" % file_name)
+			push_warning("NoiseNodeRegistry: %s has no id" % script.resource_path)
 			continue
 		out.append(type)
 	out.sort_custom(func(a: NoiseNodeType, b: NoiseNodeType) -> bool:

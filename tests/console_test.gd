@@ -28,6 +28,11 @@ func run() -> void:
 	var inspector := console.inspector()
 	var movement := console.movement_pane()
 
+	# --- sized through UiScale: embedded here, so 1:1 in logical units ---
+	check_eq(console.size, UiScale.px(ConsoleWindow.DEFAULT_SIZE, console), "the console is sized by UiScale")
+	check_approx(console.content_scale_factor, UiScale.factor_for(console), "and takes its content scale")
+	check(console.position.y >= 0, "it opens inside the main window, title bar reachable")
+
 	# --- the Shape pane has one row per spec ---
 	check_eq(inspector.row_count(), table.specs.size(), "one row per spec")
 

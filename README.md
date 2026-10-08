@@ -32,8 +32,8 @@ another monitor). It splits into the **Shape** inspector, with a row for every
 Mandelbox knob, and the **Movement** pane of virtual axes. Everything the
 console does not own is driven directly by the mouse and keyboard. Press
 **Escape** to pause: the pause menu offers Save view / Load view, the Camera
-mode, Fast Controls, a Noise editor button, and Resume / Settings / Back to
-Menu; Escape again steps back out.
+mode, Fast Controls, Console and Noise editor buttons, and Resume / Settings /
+Back to Menu; Escape again steps back out.
 
 **Settings** (from the title menu or the pause menu) has two tabs.
 
@@ -113,7 +113,8 @@ captured in this mode.
 
 ### Console (Ctrl)
 
-A Ctrl tap opens the console, a native second window split **Shape | Movement**.
+A Ctrl tap (or the pause menu's **Console…** button) opens the console, a
+native second window split **Shape | Movement**.
 
 **Shape pane.** One row per Mandelbox knob, grouped **Box** / **Julia** /
 **Iteration rotation** / **Render**:
@@ -153,8 +154,9 @@ Escape pauses and opens the menu, which holds what the old Q panel kept that is
 not a shape knob: a **Save view…** / **Load view…** row with the current file's
 name and a status line, the **Camera** mode (Fly / Orbit), the **Fast Controls**
 toggle (let the resolution governor drop render scale while you interact), a
-**Noise editor…** button, and Resume / **Settings** / Back to Menu. Settings
-holds the mouse sensitivity.
+**Console…** button (opens the console and resumes with the mouse free — the
+way in when a browser swallows the Ctrl tap), a **Noise editor…** button, and
+Resume / **Settings** / Back to Menu. Settings holds the mouse sensitivity.
 
 ## Keymap
 

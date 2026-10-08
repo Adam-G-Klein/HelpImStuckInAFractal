@@ -6,9 +6,12 @@ extends Node
 ## table + axis values + clock into the params every consumer reads. Saving and
 ## loading a view: WorkspaceFiles picks the file, Workspace does the reading and
 ## writing, the pause menu shows the result. Escape pauses the tree and opens
-## the PauseMenu; a Ctrl tap opens the console.
+## the PauseMenu; a Ctrl tap (or the pause menu's Console button) opens the
+## console.
 
 const MENU_SCENE := "res://src/ui/main_menu.tscn"
+## The main window's size in points (logical units); see UiScale.
+const WINDOW_SIZE := Vector2i(1280, 800)
 
 var params: FractalParams
 var camera: CameraState
@@ -39,6 +42,10 @@ var _ctrl := CtrlTap.new()
 
 
 func _ready() -> void:
+	# Normally done by the title menu already; repeated so main.tscn run on its
+	# own is scaled too (both calls are no-ops the second time).
+	UiScale.apply(get_window())
+	UiScale.fit_main_window(get_window(), WINDOW_SIZE)
 	params = FractalParams.new()
 	camera = CameraState.make_default()
 
@@ -165,10 +172,19 @@ func _build_pause_menu() -> void:
 	_pause.save_requested.connect(_files.prompt_save)
 	_pause.load_requested.connect(_files.prompt_load)
 	_pause.noise_requested.connect(_open_noise_from_menu)
+	_pause.console_requested.connect(_open_console_from_menu)
 
 
 func _open_noise_from_menu() -> void:
 	_noise.open()
+	resume()
+
+
+## The pause menu's Console button: open it and resume with the mouse left free
+## (as a Ctrl tap does), so the console can be used straight away.
+func _open_console_from_menu() -> void:
+	_console.open()
+	_free_requested = true
 	resume()
 
 

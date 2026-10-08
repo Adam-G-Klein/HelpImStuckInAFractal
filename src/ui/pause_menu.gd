@@ -1,20 +1,22 @@
 class_name PauseMenu
 extends CanvasLayer
 ## Escape's menu: dims the view over a controls block (Save/Load view, Camera,
-## Fast Controls, Noise editor) and Resume / Settings / Back to Menu. Main
+## Fast Controls, Console, Noise editor) and Resume / Settings / Back to Menu. Main
 ## pauses the tree and shows it; it keeps running while paused and hands the
 ## choice back through its signals. Escape inside it steps back out. On the
 ## settings' Renderer tab the dim lightens, so the view shows each change.
 ##
 ## The controls that used to live in the Q panel but are not shape knobs moved
 ## here: the file row (Save/Load + current name + status), the camera mode, Fast
-## Controls, and the Noise editor button. The shape knobs are in the console.
+## Controls, and the Noise editor button. The shape knobs are in the console,
+## which the Console button also opens: a browser can swallow a bare Ctrl tap.
 
 signal resume_requested
 signal menu_requested
 signal save_requested
 signal load_requested
 signal noise_requested
+signal console_requested
 
 const DIM := 0.6
 const DIM_RENDERER := 0.15
@@ -25,6 +27,7 @@ var menu_button: Button
 var save_button: Button
 var load_button: Button
 var noise_button: Button
+var console_button: Button
 var camera_option: OptionButton
 var fast_check: CheckBox
 var file_label: Label
@@ -81,7 +84,7 @@ func _init() -> void:
 	settings_menu.renderer_shown.connect(func(on): dim.color.a = DIM_RENDERER if on else DIM)
 
 
-## The file-row / camera / fast / noise block, styled smaller than the big
+## The file-row / camera / fast / console / noise block, styled smaller than the big
 ## menu buttons so it reads as a toolbar, not a choice.
 func _build_controls() -> Control:
 	var box := VBoxContainer.new()
@@ -123,6 +126,11 @@ func _build_controls() -> Control:
 	fast_check.tooltip_text = "Drop the render resolution while anything is moving to hold the frame rate, then snap back to full resolution when it stops."
 	box.add_child(fast_check)
 
+	console_button = Button.new()
+	console_button.text = "Console…"
+	console_button.tooltip_text = "Open the console (also a Ctrl tap): the Shape inspector of every Mandelbox knob and the Movement pane of virtual axes."
+	box.add_child(console_button)
+
 	noise_button = Button.new()
 	noise_button.text = "Noise editor…"
 	noise_button.tooltip_text = "Open the noise-field editor (also the N key): author a 3D noise field as a node graph and see it displace and tint the fractal live."
@@ -131,6 +139,7 @@ func _build_controls() -> Control:
 	save_button.pressed.connect(save_requested.emit)
 	load_button.pressed.connect(load_requested.emit)
 	noise_button.pressed.connect(noise_requested.emit)
+	console_button.pressed.connect(console_requested.emit)
 	camera_option.item_selected.connect(_on_camera_selected)
 	fast_check.toggled.connect(_on_fast_toggled)
 	show_file("")
