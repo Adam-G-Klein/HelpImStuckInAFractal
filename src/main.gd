@@ -90,6 +90,10 @@ func _build_pause_menu() -> void:
 	_pause = PauseMenu.new()
 	_pause.name = "PauseMenu"
 	add_child(_pause)
+	_pause.settings_menu.set_params(params)
+	# The Renderer tab edits params while the tree is paused. Keep the governor
+	# running so each edit still gets its full-resolution final frame.
+	governor.process_mode = Node.PROCESS_MODE_ALWAYS
 	_pause.resume_requested.connect(resume)
 	_pause.menu_requested.connect(back_to_menu)
 

@@ -2,15 +2,20 @@ class_name PauseMenu
 extends CanvasLayer
 ## Escape's menu: dims the view over Resume, Settings and Back to Menu. Main
 ## pauses the tree and shows it; it keeps running while paused and hands the
-## choice back through its signals. Escape inside it steps back out.
+## choice back through its signals. Escape inside it steps back out. On the
+## settings' Renderer tab the dim lightens, so the view shows each change.
 
 signal resume_requested
 signal menu_requested
+
+const DIM := 0.6
+const DIM_RENDERER := 0.15
 
 var resume_button: Button
 var settings_button: Button
 var menu_button: Button
 var settings_menu: SettingsMenu
+var dim: ColorRect
 
 var _list: VBoxContainer
 
@@ -20,8 +25,8 @@ func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.6)
+	dim = ColorRect.new()
+	dim.color = Color(0, 0, 0, DIM)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(dim)   # also stops clicks reaching the view underneath
 
@@ -53,6 +58,7 @@ func _init() -> void:
 	settings_button.pressed.connect(show_settings.bind(true))
 	menu_button.pressed.connect(menu_requested.emit)
 	settings_menu.back.connect(show_settings.bind(false))
+	settings_menu.renderer_shown.connect(func(on): dim.color.a = DIM_RENDERER if on else DIM)
 
 
 func open() -> void:

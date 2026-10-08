@@ -168,6 +168,26 @@ func run() -> void:
 	check_eq(pause.menu_button.text, "Back to Menu", "it offers Back to Menu")
 	pause.settings_button.pressed.emit()
 	check(pause.settings_menu.visible, "and Settings")
+	var tabs: TabContainer = pause.settings_menu.tabs
+	check(not tabs.is_tab_disabled(1), "in game, the Renderer tab is enabled")
+	var dark: float = pause.dim.color.a
+	tabs.current_tab = 1
+	check(pause.dim.color.a < dark, "the Renderer tab lightens the dim")
+	var ro = pause.settings_menu.renderer
+	ro.falloff_slider.value = 1.25
+	check_approx(main.params.detail_falloff, 1.25, "its falloff slider edits the view's params")
+	ro.steps_slider.value = 256
+	check_eq(main.params.max_steps, 256, "and its step budget")
+	main.params.detail = 3.0
+	check_approx(ro.detail_slider.value, 3.0, "and it follows outside changes")
+	ro.reset_button.pressed.emit()
+	check(main.params.detail == 1.0 and main.params.detail_falloff == 0.0 and main.params.max_steps == 128,
+		"Reset puts the renderer defaults back")
+	check_eq(main.governor.process_mode, Node.PROCESS_MODE_ALWAYS,
+		"the governor keeps running while paused, so edits get a final frame")
+	tabs.current_tab = 0
+	check_approx(pause.dim.color.a, dark, "back on Controls the dim returns")
+	tabs.current_tab = 1
 	await press_action("pause")
 	check(paused and pause.visible and not pause.settings_menu.visible,
 		"Escape in its settings goes back to the pause list")

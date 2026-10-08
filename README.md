@@ -29,10 +29,27 @@ Press **Q** to open the controls panel. Everything the panel does not own is
 driven directly by the mouse and keyboard. Press **Escape** to pause: the pause
 menu offers Resume, Settings and Back to Menu, and Escape again steps back out.
 
-**Settings** (from the title menu or the pause menu) holds the mouse
-sensitivity. It is the player's preference, not part of a view: it is kept in
-`user://settings.cfg`, survives restarts, and loading a saved view does not
-change it.
+**Settings** (from the title menu or the pause menu) has two tabs.
+
+- **Controls** holds the mouse sensitivity. It is the player's preference, not
+  part of a view: it is kept in `user://settings.cfg`, survives restarts, and
+  loading a saved view does not change it.
+- **Renderer** tunes how the open view is rendered, and is saved with the view
+  (so it is only enabled from the pause menu). While it is showing, the pause
+  dim lightens so each change can be seen behind the menu.
+
+| Renderer option | what it does |
+|---|---|
+| **Detail** | scales the precision everywhere (higher = finer structure, more steps) |
+| **Full-detail range** | how far full detail reaches, in multiples of the camera's distance to the nearest surface, so it means the same at any zoom depth |
+| **Detail falloff** | how quickly detail coarsens past that range; 0 (the default) keeps detail matched to the pixel at every distance |
+| **Max march steps** | the step budget per ray (default 128: 96 coarse + 32 fine) |
+| **Min resolution** | the lowest render scale Fast Controls may drop to while moving (default 25%) |
+| **Fast Controls** | the same toggle as in the Q panel |
+
+A ray stops once the distance estimate falls below
+`precision / detail × t × max(1, t / (range × d₀))^falloff`, where `t` is the
+distance along the ray and `d₀` the camera's distance to the nearest surface.
 
 ### Fly camera (default)
 
@@ -68,7 +85,7 @@ captured in this mode.
 
 | row | controls |
 |---|---|
-| **Save** / **Load** | pick a file in a native panel; saves live in `saves/`, tracked by git (shape, colour, precision, Julia, camera). The current file's name sits to the right |
+| **Save** / **Load** | pick a file in a native panel; saves live in `saves/`, tracked by git (shape, colour, precision, renderer options, Julia, camera). The current file's name sits to the right |
 | **Slice (Scale)** | the Mandelbox scale |
 | **Inner Radius** / **Fold** / **Outer Radius** | the three remaining shape parameters |
 | **Color** | one of the thirteen colour modes (Grayscale, Ice Fractal, Borg, Rainbow, Rainbow 2, Rainbow 3, Rainbow Metal, Blue, Blue 2, Pink-Blue, Ice Box, Ice Box 2, Gold) |

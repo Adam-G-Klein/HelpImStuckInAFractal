@@ -34,6 +34,11 @@ func run() -> void:
 	check_approx(settings.mouse_sensitivity, 0.2, "the slider sets the mouse sensitivity")
 	settings.mouse_sensitivity = 0.15
 	check_approx(menu.settings_menu.sens_slider.value, 0.15, "and follows outside changes")
+	var tabs: TabContainer = menu.settings_menu.tabs
+	check_eq(tabs.get_tab_count(), 2, "settings has two tabs")
+	check_eq([tabs.get_tab_title(0), tabs.get_tab_title(1)], ["Controls", "Renderer"], "Controls and Renderer")
+	check(tabs.is_tab_disabled(1), "with no view open, the Renderer tab is disabled")
+	check(tabs.get_tab_tooltip(1) != "", "and says where to find it")
 	await press_action("pause")
 	check(not menu.settings_menu.visible and menu.play_button.is_visible_in_tree(),
 		"Escape goes back to the list")
