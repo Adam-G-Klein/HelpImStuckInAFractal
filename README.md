@@ -82,6 +82,9 @@ captured in this mode.
 no current file it opens the Save panel. The line under the buttons reports
 each save and load, including any values a file had that this build skipped.
 
+**⌘P** (Ctrl+P elsewhere) copies a screenshot of the fractal, without the panel
+or other UI, to the clipboard as a PNG. On Linux this needs `xclip`.
+
 While Julia mode is on, a white ring marks the Julia point in the view; drag it
 (with the mouse free) to move the point in the plane facing the camera.
 

@@ -170,6 +170,14 @@ func viewport_size() -> Vector2i:
 	return _viewport.size
 
 
+## The last frame the view rendered, at its current render scale (full scale
+## once the governor has settled). null before _ready.
+func capture() -> Image:
+	if _viewport == null:
+		return null
+	return _viewport.get_texture().get_image()
+
+
 func set_render_scale(s: float) -> void:
 	render_scale = clampf(s, 0.25, 1.0)
 	_apply_size()

@@ -171,6 +171,15 @@ func load_view_from(path: String) -> void:
 		_report("Loaded %s with %d warning(s): %s" % [path.get_file(), warnings.size(), "; ".join(warnings)])
 
 
+## Cmd/Ctrl+P: put the fractal (without the panel or other UI) on the clipboard.
+func copy_screenshot() -> void:
+	var err := ClipboardImage.copy(view.capture())
+	if err == OK:
+		_report("Screenshot copied to clipboard")
+	else:
+		_report("Could not copy screenshot: %s" % error_string(err))
+
+
 func _report(line: String) -> void:
 	print(line)
 	panel.show_status(line)
@@ -211,6 +220,11 @@ func _active_camera() -> Node:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
 		pause()
+		get_viewport().set_input_as_handled()
+		return
+
+	if event.is_action_pressed("copy_screenshot"):
+		copy_screenshot()
 		get_viewport().set_input_as_handled()
 		return
 
