@@ -315,4 +315,18 @@ godot4 --headless --path . --export-release Web build/web/index.html
 ```
 
 This needs Godot's Web export templates installed; without them the export
-reports missing templates rather than writing files.
+reports missing templates rather than writing files. The export must run from a
+standard (non-mono) editor: a .NET build of Godot 4 refuses the Web preset
+even for a GDScript-only project like this one.
+
+To try the build locally, serve `build/web/` over HTTP (it will not run from
+`file://`), e.g. `python3 -m http.server --directory build/web`.
+
+### Deploying
+
+`.github/workflows/deploy-web.yml` exports the Web preset on every push to
+`main` and publishes it to GitHub Pages, at
+`https://adam-g-klein.github.io/HelpImStuckInAFractal/`. It installs Godot
+and the web templates itself; the repository only needs Pages enabled with
+**GitHub Actions** as the source (Settings > Pages), which the workflow also
+attempts on its own.

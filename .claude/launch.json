@@ -4,8 +4,21 @@
     {
       "name": "viz",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "exec python3 -m http.server \"${PORT:-8765}\" --bind 127.0.0.1 --directory docs/viz"],
+      "runtimeArgs": [
+        "-c",
+        "exec python3 -m http.server \"${PORT:-8765}\" --bind 127.0.0.1 --directory docs/viz"
+      ],
       "port": 8765,
+      "autoPort": true
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "exec python3 -m http.server \"${PORT:-8766}\" --bind 127.0.0.1 --directory build/web"
+      ],
+      "port": 8766,
       "autoPort": true
     }
   ]
