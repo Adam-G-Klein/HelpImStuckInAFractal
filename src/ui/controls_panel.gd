@@ -1,7 +1,7 @@
 class_name ControlsPanel
 extends PanelContainer
-## The Q panel. Edits FractalParams and camera settings; mirrors external
-## changes. Never touches the shader or the viewport.
+## The controls panel (a Ctrl tap toggles it). Edits FractalParams and camera
+## settings; mirrors external changes. Never touches the shader or the viewport.
 
 var scale_slider: HSlider
 var inner_slider: HSlider
@@ -143,7 +143,7 @@ func show_status(text: String) -> void:
 
 
 ## True while any text field in the panel holds keyboard focus (so Main can
-## ignore Q and let the user type a value containing "q").
+## skip the Ctrl-tap toggle while the user is editing a value).
 func text_field_has_focus() -> bool:
 	for e in [precision_edit, julia_x, julia_y, julia_z]:
 		if e.has_focus():
@@ -197,10 +197,10 @@ func _refresh() -> void:
 	sens_slider.value = _params.mouse_sensitivity
 	if _params.camera_mode == FractalParams.CameraMode.FLY and _camera != null:
 		speed_label.text = "speed x%.2f" % _camera.speed_factor
-		legend_label.text = "Q panel - WASD fly - Space/Shift up/down - wheel speed - click to capture mouse"
+		legend_label.text = "Ctrl panel - WASD fly - Space/Backspace up/down - Shift sprint - wheel speed - click to capture mouse"
 	else:
 		speed_label.text = ""
-		legend_label.text = "Q panel - left-drag orbit - Shift-drag pan - right-drag dolly - wheel zoom"
+		legend_label.text = "Ctrl panel - left-drag orbit - Shift-drag pan - right-drag dolly - wheel zoom"
 	_syncing = false
 
 

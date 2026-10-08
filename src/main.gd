@@ -23,6 +23,11 @@ var _files: WorkspaceFiles
 var _pause: PauseMenu
 var _noise: NoiseWindow
 var _loading := false
+# toggle_panel is bound to Ctrl, which is also a chord modifier (Ctrl+S saves,
+# Ctrl+P screenshots), so the panel toggles on Ctrl *release* and only when Ctrl
+# was tapped alone: a bare Ctrl key-down arms this, any other key-down while held
+# disarms it.
+var _ctrl_armed := false
 
 
 func _ready() -> void:
@@ -215,9 +220,30 @@ func _active_camera() -> Node:
 	return fly if params.camera_mode == FractalParams.CameraMode.FLY else _orbit
 
 
-# The only mouse dispatcher: Escape -> Q -> JuliaMarker -> active camera.
+# The only mouse dispatcher: Ctrl tap -> Escape/screenshot -> JuliaMarker -> camera.
 # (Paused, this does not run; the PauseMenu takes Escape instead.)
 func _unhandled_input(event: InputEvent) -> void:
+	# 1. A Ctrl tap (down then up with no other key between) toggles the panel.
+	# Ctrl is also a chord modifier (Ctrl+S quick-saves, Ctrl+P screenshots), so
+	# we toggle on *release* and only when Ctrl was tapped alone: a bare Ctrl
+	# key-down arms it, any other key-down disarms it. This runs before the
+	# action checks below so a chord's second key (e.g. P) still disarms even
+	# though copy_screenshot consumes it. Ignored while a panel text field has
+	# focus. is_action_pressed can't express "release with no chord", so we read
+	# the Ctrl key event directly; toggle_panel stays defined for the story.
+	if event is InputEventKey and not event.echo:
+		if event.physical_keycode == KEY_CTRL:
+			if event.pressed:
+				_ctrl_armed = not panel.text_field_has_focus()
+			elif _ctrl_armed:
+				_ctrl_armed = false
+				panel.visible = not panel.visible
+				_update_mouse()
+				get_viewport().set_input_as_handled()
+				return
+		elif event.pressed:
+			_ctrl_armed = false   # any other key pressed while Ctrl is held disarms
+
 	if event.is_action_pressed("pause"):
 		pause()
 		get_viewport().set_input_as_handled()
@@ -225,15 +251,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("copy_screenshot"):
 		copy_screenshot()
-		get_viewport().set_input_as_handled()
-		return
-
-	# 1. Q toggles the panel (ignored while a panel text field has focus)
-	if event.is_action_pressed("toggle_panel"):
-		if panel.text_field_has_focus():
-			return
-		panel.visible = not panel.visible
-		_update_mouse()
 		get_viewport().set_input_as_handled()
 		return
 
