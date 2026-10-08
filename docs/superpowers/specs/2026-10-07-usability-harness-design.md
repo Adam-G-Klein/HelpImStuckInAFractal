@@ -169,3 +169,45 @@ All headless, run by `tests/run_all.sh`, no desktop control anywhere.
 
 Rewriting the native windows as in-canvas floating windows (Fractacular's
 approach), a web-specific Ctrl handler, and any change to the shaders.
+
+## Addendum (2026-10-07, after acceptance)
+
+**The sub-windows are embedded.** The native acceptance pass found that on
+macOS a native console or noise window overlapping the main window corrupts the
+main window's presented frame: the whole fractal squeezed into the uncovered
+strip, or black. It reproduces on the build from before these fixes, so it is a
+Godot 4.6.1 + macOS GL Compatibility presentation bug, not ours; the ANGLE
+driver that might avoid it crashes in this build, and making the windows
+`transient` does not help. `UiScale.center_over` centring the windows over the
+main window turned the bug into the default experience. The project now sets
+`display/window/subwindows/embed_subwindows=true`: one native window, with the
+console and noise windows drawn inside it, dragged by their title bars and
+closed with their ✕. This is not the in-canvas rewrite ruled out above — they
+are the same `Window` nodes, embedded by Godot. It also stops a click on the
+view burying the console behind the main window, and makes the native build
+behave exactly like the web build and the headless tests. `UiScale` already
+treated embedded windows correctly (factor 1, logical sizes, `center_over`
+keeps the title bar inside the embedder). The trade-off: a window can no longer
+be dragged to a second monitor; enlarge or maximise the main window for room.
+
+Embedding brought two behaviours the native windows hid. Showing an embedded
+window gives it keyboard focus, and a focused embedded window keeps every key
+from the main window, so Escape, N and ⌘S did nothing while the console had
+focus; the windows now hand the keys they do not use to `Main`'s dispatch
+(`unhandled_key`). And embedded windows draw above every canvas layer, so an
+open console covered the pause menu; pausing hides the open windows and
+resuming brings them back.
+
+**The console's panes are stacked.** The UI tests found that side by side, the
+Shape inspector's minimum width (643) plus the Movement pane's (401) overflowed
+the 1000-wide console: the Movement pane ran 56 px past the right edge, so each
+axis's ✕ was unreachable, and every Shape slider shrank to its 16 px grabber.
+The console is now a `VSplitContainer`: the inspector on top with the full
+width (sliders about 370 px), the Movement pane below at its natural height.
+
+**File panels work while paused.** The pause menu opens the Save view… / Load
+view… panels with the tree paused, and `WorkspaceFiles` created them under
+`Main` with the default (inherited, pausable) process mode, so Godot's own
+panel ignored every key and click. macOS hid this behind the native panel
+(`use_native_dialog`), but the web build and any embedded panel were frozen.
+`WorkspaceFiles` now runs `PROCESS_MODE_ALWAYS`, and its dialogs inherit it.
