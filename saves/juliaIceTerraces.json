@@ -1,18 +1,39 @@
 {
-	"version": 1,
+	"version": 2,
+	"shape": {
+		"defaults": {
+			"box_scale": -1.88,
+			"fold_limit": 0.81,
+			"min_radius": 0.49,
+			"fixed_radius": 0.53,
+			"fold_order": 0,
+			"w": 0.0,
+			"julia_all": true,
+			"julia_0": false,
+			"julia_1": false,
+			"julia_2": false,
+			"julia_3": false,
+			"c_0": -0.23,
+			"c_1": 1.512,
+			"c_2": 1.892,
+			"c_3": 0.0,
+			"iter_rot_xy": 0.0,
+			"iter_rot_xz": 0.0,
+			"iter_rot_xw": 0.0,
+			"iter_rot_yz": 0.0,
+			"iter_rot_yw": 0.0,
+			"iter_rot_zw": 0.0,
+			"color_mode": 1,
+			"precision": 0.0001
+		},
+		"bindings": {
+
+		}
+	},
+	"axes": {
+
+	},
 	"fractal": {
-		"scale": -1.88,
-		"inner_radius": 0.49,
-		"fold_limit": 0.81,
-		"outer_radius": 0.53,
-		"color_mode": 1,
-		"precision": 0.0001,
-		"julia_enabled": true,
-		"julia_point": [
-			-0.23,
-			1.512,
-			1.892
-		],
 		"fast_controls": true,
 		"camera_mode": "fly",
 		"mouse_sensitivity": 0.1
@@ -31,7 +52,7 @@
 		"up": [
 			-0.3099755,
 			-0.1445439,
-			0.9396927
+			0.9396928
 		],
 		"speed_factor": 1.0
 	}

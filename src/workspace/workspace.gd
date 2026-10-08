@@ -1,45 +1,37 @@
 class_name Workspace
 extends RefCounted
-## Saving and loading a view as JSON: every FractalParams value and the camera.
+## Saving and loading a view as JSON, version 2: the shape as an AttributeTable
+## (defaults + active bindings), the axis values, the non-shape preference
+## fields, and the camera. The clock and the keymap are deliberately not saved
+## (a level loads a view and a keymap separately, and the same view plays under
+## different key pairs).
 ##
-## What is saved: the shape (scale, the three radii), the colour mode, the
-## precision, Julia mode and its point, fast controls, the camera mode, the
-## mouse sensitivity, and the camera's eye, orientation and speed factor. What
-## is not: anything derivable (the orbit centre, the governor's render scale,
-## rendered pixels).
-##
-## Loading never fails on unfamiliar content. An unknown or malformed key is
-## skipped and reported as a warning string, and a key the file does not have
-## leaves the current value alone, so a file written by a newer build still
-## restores what this one understands. VERSION only changes if an existing key
-## changes meaning; a new key is additive.
+## Loading never fails on unfamiliar content: an unknown shape id or axis id is
+## skipped with a warning, and a key the file lacks leaves the current value
+## alone. A version-1 file (the old flat "fractal" section) is migrated to the
+## new ids without a warning. Saving always writes version 2.
 
-const VERSION := 1
+const VERSION := 2
 
-## The FractalParams values written under "fractal", in file order. Colour mode
-## is stored as the site's id, camera mode by name, the Julia point as [x, y, z].
-const PARAM_KEYS: Array[String] = [
-	"scale", "inner_radius", "fold_limit", "outer_radius", "color_mode",
-	"precision", "julia_enabled", "julia_point", "fast_controls",
-	"camera_mode", "mouse_sensitivity",
-]
+## The preference fields kept under "fractal" (everything that is not a shape
+## knob). Iterated so the later level-of-detail merge is a small diff: add its
+## keys here and to _parse_fractal.
+const FRACTAL_KEYS: Array[String] = ["fast_controls", "camera_mode", "mouse_sensitivity"]
 const CAMERA_MODE_NAMES: Array[String] = ["fly", "orbit"]
 
 
-## Snapshot the view. Pure: it reads, it does not change anything. `noise` is the
-## noise graph's dict; when non-empty it is stored under an additive "noise" key,
-## which an older build simply ignores on load.
-static func capture(params: FractalParams, camera: CameraState, noise := {}) -> Dictionary:
+## Snapshot the view. Pure: it reads, it does not change anything.
+static func capture(table: AttributeTable, axes: Axes, params: FractalParams, camera: CameraState, noise := {}) -> Dictionary:
 	var fractal := {}
-	for key in PARAM_KEYS:
+	for key in FRACTAL_KEYS:
 		var value: Variant = params.get(key)
 		if key == "camera_mode":
 			value = CAMERA_MODE_NAMES[int(value)]
-		elif value is Vector3:
-			value = _vec_to_array(value)
 		fractal[key] = value
 	var out := {
 		"version": VERSION,
+		"shape": table.to_dict(),
+		"axes": axes.values_by_string(),
 		"fractal": fractal,
 		"camera": {
 			"eye": _vec_to_array(camera.eye()),
@@ -53,19 +45,39 @@ static func capture(params: FractalParams, camera: CameraState, noise := {}) -> 
 	return out
 
 
-## Apply a capture. Returns the warnings, one string per thing it skipped.
-## Each value is checked before it is written, so a malformed file changes
-## only the values it got right.
-static func restore(data: Dictionary, params: FractalParams, camera: CameraState) -> Array:
+## Apply a capture (already in version-2 shape). Returns the warnings.
+static func restore(data: Dictionary, table: AttributeTable, axes: Axes, params: FractalParams, camera: CameraState) -> Array:
 	var warnings: Array = []
+
+	var shape: Variant = data.get("shape", {})
+	if shape is Dictionary:
+		for w in table.apply_dict(shape):
+			warnings.append(w)
+	else:
+		warnings.append("Malformed shape section ignored")
+
+	var axis_values: Variant = data.get("axes", {})
+	if axis_values is Dictionary:
+		for key in axis_values:
+			var id := StringName(key)
+			if not axes.has(id):
+				warnings.append("Axis value for unknown axis '%s' dropped" % key)
+				continue
+			var v: Variant = axis_values[key]
+			if v is float or v is int:
+				axes.set_value(id, float(v))
+			else:
+				warnings.append("Malformed axis value '%s' ignored" % key)
+	else:
+		warnings.append("Malformed axes section ignored")
 
 	var fractal: Variant = data.get("fractal", {})
 	if fractal is Dictionary:
 		for key in fractal:
-			if not PARAM_KEYS.has(key):
+			if not FRACTAL_KEYS.has(key):
 				warnings.append("Unknown fractal value '%s' ignored" % key)
 				continue
-			var value: Variant = _parse_param(key, fractal[key])
+			var value: Variant = _parse_fractal(key, fractal[key])
 			if value == null:
 				warnings.append("Malformed '%s' ignored" % key)
 				continue
@@ -82,21 +94,18 @@ static func restore(data: Dictionary, params: FractalParams, camera: CameraState
 	return warnings
 
 
-## Write a capture to `path` as indented JSON. `noise`, when non-empty, is stored
-## under the "noise" key.
-static func save_file(path: String, params: FractalParams, camera: CameraState, noise := {}) -> Error:
+static func save_file(path: String, table: AttributeTable, axes: Axes, params: FractalParams, camera: CameraState, noise := {}) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
-	file.store_string(JSON.stringify(capture(params, camera, noise), "\t", false))
+	file.store_string(JSON.stringify(capture(table, axes, params, camera, noise), "\t", false))
 	file.close()
 	return OK
 
 
-## Read `path` and restore it. Never throws: a missing file, unreadable file,
-## bad JSON or unsupported version return `ok == false` with a warning and
-## change nothing.
-static func load_file(path: String, params: FractalParams, camera: CameraState) -> Dictionary:
+## Read `path` and restore it. Never throws. A version-1 file is migrated to the
+## version-2 shape before restoring, without a warning.
+static func load_file(path: String, table: AttributeTable, axes: Axes, params: FractalParams, camera: CameraState) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return _failure("No saved view at %s" % path)
 	var file := FileAccess.open(path, FileAccess.READ)
@@ -104,9 +113,6 @@ static func load_file(path: String, params: FractalParams, camera: CameraState) 
 		return _failure("Could not read %s (error %d)" % [path, FileAccess.get_open_error()])
 	var text := file.get_as_text()
 	file.close()
-	# JSON.new().parse() instead of JSON.parse_string(): the static helper
-	# pushes an engine error on malformed input, and a bad file is an expected
-	# outcome here, not a bug.
 	var json := JSON.new()
 	if json.parse(text) != OK:
 		return _failure("%s is not valid JSON (line %d: %s)" % [path, json.get_error_line(), json.get_error_message()])
@@ -114,18 +120,17 @@ static func load_file(path: String, params: FractalParams, camera: CameraState) 
 	if not (data is Dictionary):
 		return _failure("%s does not contain a saved view" % path)
 	var version := int((data as Dictionary).get("version", 0))
-	if version != VERSION:
+	if version == 1:
+		data = _migrate_v1(data)
+	elif version != VERSION:
 		return _failure("Save version %d is not supported (this build reads version %d)" % [version, VERSION])
-	# The noise graph is handed back raw for the caller to apply to its editor; a
-	# file without the key leaves the current graph alone (null here means "none").
 	var noise: Variant = (data as Dictionary).get("noise", null)
 	if not (noise is Dictionary):
 		noise = null
-	return {"ok": true, "warnings": restore(data, params, camera), "noise": noise}
+	return {"ok": true, "warnings": restore(data, table, axes, params, camera), "noise": noise}
 
 
-## Write a graph-only noise file: {"version": VERSION, "noise": {...}}. The editor
-## uses this for its own Save…; a view save embeds the same dict under "noise".
+## A graph-only noise file: {"version": VERSION, "noise": {...}}.
 static func save_noise_file(path: String, noise_dict: Dictionary) -> Error:
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
@@ -135,8 +140,8 @@ static func save_noise_file(path: String, noise_dict: Dictionary) -> Error:
 	return OK
 
 
-## Read a graph-only noise file. Returns {ok, warnings, noise} where `noise` is the
-## raw dict (the caller builds the graph) or {} on failure. Never throws.
+## Read a graph-only noise file. Returns {ok, warnings, noise}. Accepts version
+## 1 and 2 (the noise section is the same in both).
 static func load_noise_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {"ok": false, "warnings": ["No noise graph at %s" % path], "noise": {}}
@@ -152,7 +157,7 @@ static func load_noise_file(path: String) -> Dictionary:
 	if not (data is Dictionary):
 		return {"ok": false, "warnings": ["%s does not contain a noise graph" % path], "noise": {}}
 	var version := int((data as Dictionary).get("version", 0))
-	if version != VERSION:
+	if version != 1 and version != VERSION:
 		return {"ok": false, "warnings": ["Noise file version %d is not supported" % version], "noise": {}}
 	var noise: Variant = (data as Dictionary).get("noise", {})
 	if not (noise is Dictionary):
@@ -164,22 +169,49 @@ static func _failure(message: String) -> Dictionary:
 	return {"ok": false, "warnings": [message]}
 
 
-## The typed value for one "fractal" key, or null when it is malformed.
-static func _parse_param(key: String, raw: Variant) -> Variant:
+## Turn a version-1 file (flat "fractal" section with the old ids) into the
+## version-2 shape. Unknown/new ids are mapped; the clock and axes had no v1.
+static func _migrate_v1(data: Dictionary) -> Dictionary:
+	var old: Dictionary = data.get("fractal", {}) if data.get("fractal", {}) is Dictionary else {}
+	var defaults := {}
+	var rename := {
+		"scale": "box_scale", "inner_radius": "min_radius", "outer_radius": "fixed_radius",
+		"fold_limit": "fold_limit", "color_mode": "color_mode", "precision": "precision",
+		"julia_enabled": "julia_all",
+	}
+	for k in rename:
+		if old.has(k):
+			defaults[rename[k]] = old[k]
+	if old.has("julia_point") and old["julia_point"] is Array and (old["julia_point"] as Array).size() == 3:
+		var jp: Array = old["julia_point"]
+		defaults["c_0"] = jp[0]
+		defaults["c_1"] = jp[1]
+		defaults["c_2"] = jp[2]
+	var fractal := {}
+	for k in FRACTAL_KEYS:
+		if old.has(k):
+			fractal[k] = old[k]
+	var out := {
+		"version": VERSION,
+		"shape": {"defaults": defaults, "bindings": {}},
+		"axes": {},
+		"fractal": fractal,
+		"camera": data.get("camera", {}),
+	}
+	if data.has("noise"):
+		out["noise"] = data["noise"]
+	return out
+
+
+## The typed value for one "fractal" key, or null when malformed.
+static func _parse_fractal(key: String, raw: Variant) -> Variant:
 	match key:
-		"julia_enabled", "fast_controls":
+		"fast_controls":
 			return raw if raw is bool else null
-		"julia_point":
-			return _array_to_vec(raw)
-		"color_mode":
-			if not (raw is float or raw is int):
-				return null
-			var id := int(raw)
-			return id if FractalParams.COLOR_MODE_IDS.has(id) else null
 		"camera_mode":
 			var index := CAMERA_MODE_NAMES.find(String(raw)) if raw is String else -1
 			return index if index >= 0 else null
-		"precision", "mouse_sensitivity":
+		"mouse_sensitivity":
 			return float(raw) if (raw is float or raw is int) and float(raw) > 0.0 else null
 		_:
 			return float(raw) if (raw is float or raw is int) else null
@@ -206,9 +238,6 @@ static func _restore_camera(cam: Dictionary, camera: CameraState, warnings: Arra
 			warnings.append("Malformed camera speed_factor ignored")
 
 
-## Vector3 is single precision, so its components are rounded to the seven
-## significant digits a float32 actually holds; otherwise -0.23 is written as
-## -0.230000004172325.
 static func _vec_to_array(v: Vector3) -> Array:
 	return [_tidy(v.x), _tidy(v.y), _tidy(v.z)]
 
@@ -221,7 +250,6 @@ static func _tidy(x: float) -> float:
 	return roundf(x * p) / p
 
 
-## A Vector3 from a three-number array, or null.
 static func _array_to_vec(raw: Variant) -> Variant:
 	if not (raw is Array) or raw.size() != 3:
 		return null

@@ -103,9 +103,17 @@ func step(id: StringName, direction: float, delta: float) -> void:
 	changed.emit()
 
 
-## Every axis value by id, for the resolver and for saves.
+## Every axis value by id (StringName keys), for the resolver.
 func values() -> Dictionary:
 	var out := {}
 	for a in _list:
 		out[a.id] = a.value
+	return out
+
+
+## Every axis value by id as a String key, for JSON saves.
+func values_by_string() -> Dictionary:
+	var out := {}
+	for a in _list:
+		out[String(a.id)] = a.value
 	return out

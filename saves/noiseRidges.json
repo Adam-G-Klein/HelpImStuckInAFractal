@@ -1,36 +1,164 @@
 {
-	"version": 1,
+	"version": 2,
+	"shape": {
+		"defaults": {
+			"box_scale": -2.09,
+			"fold_limit": 1.0,
+			"min_radius": 0.7,
+			"fixed_radius": 1.0,
+			"fold_order": 0,
+			"w": 0.0,
+			"julia_all": false,
+			"julia_0": false,
+			"julia_1": false,
+			"julia_2": false,
+			"julia_3": false,
+			"c_0": -0.23,
+			"c_1": 1.512,
+			"c_2": 1.892,
+			"c_3": 0.0,
+			"iter_rot_xy": 0.0,
+			"iter_rot_xz": 0.0,
+			"iter_rot_xw": 0.0,
+			"iter_rot_yz": 0.0,
+			"iter_rot_yw": 0.0,
+			"iter_rot_zw": 0.0,
+			"color_mode": 1,
+			"precision": 0.000025
+		},
+		"bindings": {
+
+		}
+	},
+	"axes": {
+
+	},
 	"fractal": {
-		"scale": -2.09,
-		"inner_radius": 0.7,
-		"fold_limit": 1.0,
-		"outer_radius": 1.0,
-		"color_mode": 1,
-		"precision": 0.000025,
-		"julia_enabled": false,
-		"julia_point": [-0.23, 1.512, 1.892],
 		"fast_controls": true,
 		"camera_mode": "fly",
 		"mouse_sensitivity": 0.1
 	},
 	"camera": {
-		"eye": [8.175847, 3.81246, 3.283393],
-		"forward": [-0.8516508, -0.3971313, -0.3420201],
-		"up": [-0.3099755, -0.1445439, 0.9396927],
+		"eye": [
+			8.175847,
+			3.81246,
+			3.283393
+		],
+		"forward": [
+			-0.8516508,
+			-0.3971313,
+			-0.3420201
+		],
+		"up": [
+			-0.3099755,
+			-0.1445439,
+			0.9396928
+		],
 		"speed_factor": 1.0
 	},
 	"noise": {
 		"nodes": [
-			{"id": "position_0", "type": "position", "position": [40, 40], "params": {}, "extras": {}, "controls_open": true, "preview_open": true},
-			{"id": "value_noise_0", "type": "value_noise", "position": [260, 40], "params": {"scale": 1.8, "seed": 3.0, "octaves": 4, "lacunarity": 2.0, "gain": 0.5}, "extras": {}, "controls_open": true, "preview_open": true},
-			{"id": "math_0", "type": "math", "position": [480, 40], "params": {"op": 7}, "extras": {}, "controls_open": true, "preview_open": true},
-			{"id": "output_0", "type": "output", "position": [720, 40], "params": {"amplitude": 0.12, "step_scale": 0.4, "tint_strength": 0.55}, "extras": {"tint_color": [0.2, 0.75, 1.0, 1.0]}, "controls_open": true, "preview_open": true}
+			{
+				"id": "position_0",
+				"type": "position",
+				"position": [
+					40.0,
+					40.0
+				],
+				"params": {
+
+				},
+				"extras": {
+
+				},
+				"controls_open": true,
+				"preview_open": true
+			},
+			{
+				"id": "value_noise_0",
+				"type": "value_noise",
+				"position": [
+					260.0,
+					40.0
+				],
+				"params": {
+					"scale": 1.8,
+					"seed": 3.0,
+					"octaves": 4.0,
+					"lacunarity": 2.0,
+					"gain": 0.5
+				},
+				"extras": {
+
+				},
+				"controls_open": true,
+				"preview_open": true
+			},
+			{
+				"id": "math_0",
+				"type": "math",
+				"position": [
+					480.0,
+					40.0
+				],
+				"params": {
+					"op": 7.0
+				},
+				"extras": {
+
+				},
+				"controls_open": true,
+				"preview_open": true
+			},
+			{
+				"id": "output_0",
+				"type": "output",
+				"position": [
+					720.0,
+					40.0
+				],
+				"params": {
+					"amplitude": 0.12,
+					"step_scale": 0.4,
+					"tint_strength": 0.55
+				},
+				"extras": {
+					"tint_color": [
+						0.2,
+						0.75,
+						1.0,
+						1.0
+					]
+				},
+				"controls_open": true,
+				"preview_open": true
+			}
 		],
 		"links": [
-			{"from": "position_0", "from_port": 0, "to": "value_noise_0", "to_port": 0},
-			{"from": "value_noise_0", "from_port": 0, "to": "math_0", "to_port": 0},
-			{"from": "math_0", "from_port": 0, "to": "output_0", "to_port": 0},
-			{"from": "math_0", "from_port": 0, "to": "output_0", "to_port": 1}
+			{
+				"from": "position_0",
+				"from_port": 0.0,
+				"to": "value_noise_0",
+				"to_port": 0.0
+			},
+			{
+				"from": "value_noise_0",
+				"from_port": 0.0,
+				"to": "math_0",
+				"to_port": 0.0
+			},
+			{
+				"from": "math_0",
+				"from_port": 0.0,
+				"to": "output_0",
+				"to_port": 0.0
+			},
+			{
+				"from": "math_0",
+				"from_port": 0.0,
+				"to": "output_0",
+				"to_port": 1.0
+			}
 		]
 	}
 }
