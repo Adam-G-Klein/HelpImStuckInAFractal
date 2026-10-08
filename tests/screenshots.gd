@@ -53,7 +53,69 @@ func _run() -> void:
 			img.save_png(ProjectSettings.globalize_path(SHOT_DIR + "/mode_%d.png" % id))
 			_pass("mode_%d" % id)
 
+	# noise ridges demo: a saved view with a wired noise field. Rendered through the
+	# same view, which rebuilds the mandelbox shader with the compiled NOISE region.
+	params.color_mode = 1   # back to Ice Fractal before capturing the default again
+	var np := FractalParams.new()
+	var ncam := CameraState.make_default()
+	var loaded := Workspace.load_file("res://saves/noiseRidges.json", np, ncam)
+	if not loaded["ok"]:
+		_fail("noise_ridges", "load_failed:%s" % loaded["warnings"])
+	else:
+		view.setup(np, ncam)
+		view.set_render_scale(1.0)
+		var noise: Variant = loaded.get("noise", null)
+		if noise is Dictionary:
+			var warnings: Array = []
+			var graph := NoiseGraph.from_dict(noise, warnings, Callable(NoiseNodeRegistry, "type_by_id"))
+			view.set_noise_graph(graph)
+			if not warnings.is_empty():
+				_fail("noise_ridges", "graph_warnings:%s" % warnings)
+		await _render(view)
+		# the default view, at the same framing, for a difference check
+		var plain_params := np.duplicate()
+		var plain_view: FractalView = load("res://src/fractal/fractal_view.tscn").instantiate()
+		root.add_child(plain_view)
+		plain_view.size = Vector2(800, 600)
+		plain_view.setup(plain_params, ncam)
+		plain_view.set_render_scale(1.0)
+		await _render(plain_view)
+		var ridges := view._viewport.get_texture().get_image()
+		var plain := plain_view._viewport.get_texture().get_image()
+		if ridges == null:
+			_fail("noise_ridges", "no_image")
+		else:
+			ridges.save_png(ProjectSettings.globalize_path(SHOT_DIR + "/noise_ridges.png"))
+			_check_noise(ridges, plain)
+		plain_view.queue_free()
+
 	view.queue_free()
+
+
+## The noise view must not be blank and must differ from the same view with no
+## field: the displacement really changed the shape.
+func _check_noise(ridges: Image, plain: Image) -> void:
+	var w := ridges.get_width()
+	var h := ridges.get_height()
+	var nonbg := 0
+	var diff := 0
+	var total := 0
+	for y in range(0, h, 4):
+		for x in range(0, w, 4):
+			var c := ridges.get_pixel(x, y)
+			total += 1
+			if c.r > 0.02 or c.g > 0.02 or c.b > 0.02:
+				nonbg += 1
+			if plain != null:
+				var d := plain.get_pixel(x, y)
+				if absf(c.r - d.r) + absf(c.g - d.g) + absf(c.b - d.b) > 0.06:
+					diff += 1
+	var nonbg_frac := float(nonbg) / float(maxi(total, 1))
+	var diff_frac := float(diff) / float(maxi(total, 1))
+	if nonbg_frac > 0.05 and diff_frac > 0.02:
+		_pass("noise_ridges")
+	else:
+		_fail("noise_ridges", "nonbg=%.3f diff=%.3f (is the field wired and visible?)" % [nonbg_frac, diff_frac])
 
 
 func _render(view: FractalView) -> void:

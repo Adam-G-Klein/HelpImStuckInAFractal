@@ -39,6 +39,7 @@ change it.
 | key / action | what it does |
 |---|---|
 | **Q** | toggle the controls panel (also releases/recaptures the mouse) |
+| **N** | toggle the noise-field editor (also releases/recaptures the mouse) |
 | **Escape** | pause menu (releases the mouse; resuming recaptures it) |
 | **W / A / S / D** | move forward / left / back / right |
 | **Space / Shift** | move up / down (world-relative to the camera's own up) |
@@ -99,6 +100,49 @@ are. An exported build cannot write into the project, so it saves to
 | `saves/default.json` | the opening view |
 | `saves/juliaIceField.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Slice −2.29, Inner 0, Fold 0.72, Outer 0.29, Ice Fractal, precision 0.00002 |
 | `saves/juliaIceTerraces.json` | Julia mode at `(-0.23, 1.512, 1.892)`, Slice −1.88, Inner 0.49, Fold 0.81, Outer 0.53, Ice Fractal, precision 0.0001 |
+| `saves/noiseRidges.json` | the default Ice Fractal view with a noise field wired: value-noise ridges displacing the surface and tinting it blue (see **Noise fields**) |
+
+## Noise fields
+
+Press **N** (or the **Noise editor…** button in the Q panel) to open the
+noise-field editor: an in-app node graph, ported from Fractacular's Isolation
+window, that builds a 3D scalar field and overlays it on the Mandelbox. Wiring it
+to the **Output** node does two things to the picture, live as you edit:
+
+- **Displace** — the field is multiplied by Amplitude and added to the distance
+  estimate, so the surface ripples, bulges or erodes. A positive value pushes the
+  surface *in*. While Displace is wired, each ray-march step is shortened by the
+  Output's **Step scale** so the march does not step over the displaced surface.
+- **Tint** — the surface colour is blended toward the Output's **Tint colour** by
+  the field, scaled by **Tint strength**.
+
+Opening the editor frees the mouse the way the Q panel does; a click in the view
+in Fly mode closes it and recaptures. **Orbit** mode (Camera dropdown) is the
+comfortable way to author, since the mouse is never captured. Each node with an
+output carries a live preview — a flat slice of the field — and the toolbar's
+**Extent** and **Slice Z** choose which slice every preview shows. Right-click the
+canvas for the add menu; drag between the coloured ports to wire (green is a
+Float scalar field, amber a Vec3 vector field); Delete, Backspace or right-click a
+wire to remove it.
+
+| group | nodes |
+|---|---|
+| **Source** | **Position** — the sample point, in fractal coordinates (one per graph) |
+| **Noise** | **Value noise**, **Gradient noise** (both with Octaves/Lacunarity/Gain FBM), **Cellular** (Worley F1) |
+| **Vector** | **Transform** (offset, scale, rotate), **Warp** (domain warp), **Combine XYZ**, **Split XYZ** |
+| **Math** | **Constant**, **Math** (Add…Fract), **Remap**, **Clamp**, **Mix**, **Length** |
+| **Output** | **Output** — Displace and Tint inputs, Amplitude, Step scale, Tint colour and strength (one per graph) |
+
+**Saving.** The graph is saved with the view, as an additive `"noise"` key in the
+same JSON file — a view without the key leaves the current field alone. The editor
+can also save and load graphs on their own, as `saves/noise/*.json`
+(`{"version": 1, "noise": {…}}`), with its own **Save…** / **Load…** buttons.
+Load **`saves/noiseRidges.json`** for a one-click demo: value-noise ridges
+displacing and blue-tinting the default Ice Fractal view.
+
+A FLOAT parameter edit only re-pushes a shader uniform; an Octaves/op/toggle edit
+(baked into the generated GLSL) recompiles the shader. An unwired graph compiles
+to nothing, so the picture and its cost are exactly as if there were no editor.
 
 ## Default view
 
