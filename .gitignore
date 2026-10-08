@@ -31,3 +31,6 @@ screenshots/
 
 # Claude Code per-user settings
 .claude/settings.local.json
+
+# Agent worktrees kept inside the repo
+.claude/worktrees/
