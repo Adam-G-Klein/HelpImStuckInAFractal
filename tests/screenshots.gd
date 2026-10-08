@@ -42,6 +42,29 @@ func _run() -> void:
 		def.save_png(ProjectSettings.globalize_path(SHOT_DIR + "/default_view.png"))
 		_check_default(def)
 
+	# console_bound_axis: Axis A bound to box_scale at gain 0.5, the axis held
+	# for one second (value 1.0) so box_scale resolves to -2.09 + 0.5 = -1.59.
+	# The picture must differ from the default view — the binding really drove
+	# the shape. Rendered through the same view, then the view is restored.
+	var bound_table := AttributeTable.new(MandelboxShape.specs())
+	var bind := Binding.new(); bind.source = &"a"; bind.gain = 0.5
+	bound_table.set_binding(&"box_scale", bind)
+	var bound_axes := Axes.new(); bound_axes.add(&"a", "Axis A", 1.0); bound_axes.set_value(&"a", 1.0)
+	var bound_params := FractalParams.new()
+	bound_params.apply_resolved(BindingResolver.resolve(bound_table, bound_axes.values(), 0.0))
+	view.setup(bound_params, cam)
+	view.set_render_scale(1.0)
+	await _render(view)
+	var bound_img := view._viewport.get_texture().get_image()
+	if bound_img == null or def == null:
+		_fail("console_bound_axis", "no_image")
+	else:
+		bound_img.save_png(ProjectSettings.globalize_path(SHOT_DIR + "/console_bound_axis.png"))
+		_check_differs("console_bound_axis", bound_img, def)
+	# restore the view to the default params for the colour-mode loop
+	view.setup(params, cam)
+	await _render(view)
+
 	# one PNG per colour mode
 	for id in FractalParams.COLOR_MODE_IDS:
 		params.color_mode = id
@@ -58,10 +81,13 @@ func _run() -> void:
 	params.color_mode = 1   # back to Ice Fractal before capturing the default again
 	var np := FractalParams.new()
 	var ncam := CameraState.make_default()
-	var loaded := Workspace.load_file("res://saves/noiseRidges.json", np, ncam)
+	var ntable := AttributeTable.new(MandelboxShape.specs())
+	var naxes := Axes.new()
+	var loaded := Workspace.load_file("res://saves/noiseRidges.json", ntable, naxes, np, ncam)
 	if not loaded["ok"]:
 		_fail("noise_ridges", "load_failed:%s" % loaded["warnings"])
 	else:
+		np.apply_resolved(BindingResolver.resolve(ntable, naxes.values(), 0.0))
 		view.setup(np, ncam)
 		view.set_render_scale(1.0)
 		var noise: Variant = loaded.get("noise", null)
@@ -116,6 +142,26 @@ func _check_noise(ridges: Image, plain: Image) -> void:
 		_pass("noise_ridges")
 	else:
 		_fail("noise_ridges", "nonbg=%.3f diff=%.3f (is the field wired and visible?)" % [nonbg_frac, diff_frac])
+
+
+## Two renders must differ across more than `min_frac` of the sampled pixels.
+func _check_differs(id: String, a: Image, b: Image, min_frac := 0.02) -> void:
+	var w := a.get_width()
+	var h := a.get_height()
+	var diff := 0
+	var total := 0
+	for y in range(0, h, 4):
+		for x in range(0, w, 4):
+			total += 1
+			var ca := a.get_pixel(x, y)
+			var cb := b.get_pixel(x, y)
+			if absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b) > 0.06:
+				diff += 1
+	var frac := float(diff) / float(maxi(total, 1))
+	if frac > min_frac:
+		_pass(id)
+	else:
+		_fail(id, "diff=%.3f (the binding did not change the picture)" % frac)
 
 
 func _render(view: FractalView) -> void:
