@@ -3,6 +3,10 @@ extends Control
 ## Renders the fractal in a SubViewport and displays it full-window. Also owns
 ## the ray maths (project/unproject) so the Julia marker and orbit camera agree
 ## with the shader exactly.
+##
+## `size` (and so project/unproject) is in logical units; the SubViewport is in
+## physical pixels: size * render_scale * the window's content scale (UiScale),
+## so the still frame is sharp on a HiDPI screen.
 
 const TAN_HALF_FOV := 0.36397023426620234  # tan(20 degrees), half of a 40 deg vertical FOV
 
@@ -47,6 +51,9 @@ func _ready() -> void:
 	_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	resized.connect(_apply_size)
+	# A content-scale change resizes the window's viewport without necessarily
+	# resizing this Control; the pixel size still has to follow.
+	get_viewport().size_changed.connect(_apply_size)
 	_apply_size()
 	# setup() may have run before _ready wired the material (e.g. a test or the
 	# screenshot pass that adds the view and calls setup() in the same frame).
@@ -244,15 +251,30 @@ func _aspect() -> float:
 	return size.x / maxf(size.y, 1.0)
 
 
+## Size the SubViewport in physical pixels. A new size reallocates its target,
+## so it also requests a frame: with UPDATE_ONCE already consumed, a window
+## resize used to leave the view black until something moved.
 func _apply_size() -> void:
 	if _viewport == null:
 		return  # setup()/set_render_scale() may run before _ready
-	var px := Vector2i(maxi(1, int(round(size.x * render_scale))),
-		maxi(1, int(round(size.y * render_scale))))
-	_viewport.size = px
-	_rect.size = Vector2(px)
+	var s := render_scale * _content_scale()
+	var px := Vector2i(maxi(1, int(round(size.x * s))), maxi(1, int(round(size.y * s))))
 	if _material:
 		_material.set_shader_parameter("aspect", _aspect())
+	if px == _viewport.size:
+		return
+	_viewport.size = px
+	_rect.size = Vector2(px)
+	request_frame()
+
+
+## Physical pixels per logical unit where the view is drawn: its window's
+## content scale, 1 inside a SubViewport or out of the tree.
+func _content_scale() -> float:
+	if not is_inside_tree():
+		return 1.0
+	var win := get_viewport() as Window
+	return win.content_scale_factor if win != null else 1.0
 
 
 func _on_params_changed() -> void:
