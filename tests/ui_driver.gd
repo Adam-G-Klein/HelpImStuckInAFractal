@@ -174,6 +174,23 @@ func wheel(target: Variant, down: bool = true, times: int = 1) -> void:
 		await button(index, false)
 
 
+## Wheel over a ScrollContainer until `control` sits wholly inside it, the way a
+## player scrolls a long list to reach a row. Returns true when it got there.
+func scroll_to(scroll: ScrollContainer, control: Control, max_clicks: int = 200) -> bool:
+	for i in max_clicks:
+		var view := global_rect(scroll)
+		var r := global_rect(control)
+		if view.encloses(r):
+			return true
+		var down := r.get_center().y > view.get_center().y
+		var before := scroll.scroll_vertical
+		# over the left edge, where the row labels are, never a value widget
+		await wheel(Vector2(view.position.x + 10.0, view.get_center().y), down)
+		if scroll.scroll_vertical == before:
+			return view.encloses(global_rect(control))
+	return false
+
+
 ## A trackpad two-finger scroll (what macOS produces). `delta` is in the
 ## gesture's own units: a ScrollContainer moves `page * delta / 8` per event, so
 ## Vector2(0, 1) is an eighth of a page down.
