@@ -120,11 +120,11 @@ static func waveform_value(raw: float, waveform: Binding.Waveform, period: float
 	return raw
 ```
 
-- [ ] **Step 1: Write `tests/attribute_test.gd`.** Adapt `Fractacular/tests/attribute_test.gd`: drop the `category` arg (specs built with no category), drop `specs_in`/`copy_category_from`/`has_time_binding` assertions. Keep: `make` id→StringName, hard_min/max defaults, float clamp, wide hard range, wrap fold, INT round/clamp/step, BOOL/ENUM not bindable, ENUM keep/fallback, enum_values default to indices, show_when, table keeps specs, `ids()` ordered, `set_default` sanitizes + emits once + no-emit on same value, bindable rows have a Binding, `has_active_binding`, `duplicate` independent, `to_dict`/`apply_dict` round trip with an unknown id warned.
-- [ ] **Step 2: Write `tests/binding_test.gd`.** Resolver: unbound float/int return default; `&"time"` reads t; a known axis id reads `axis_values[id]`; a missing axis id yields raw 0 (→ default); non-bindable returns default; the three waveforms at known points (as Fractacular's binding_test); sanitize applied (clamp to hard_max, wrap angle). Use `axis_values` dict form, e.g. `resolve(table, {&"a": 1.5}, 0.0)`.
-- [ ] **Step 3: Create the four source files** (ports + rewrites above).
-- [ ] **Step 4: Import + run.** `godot4 --headless --import --path <worktree>` then `godot4 --headless --path <worktree> -s tests/attribute_test.gd` and `-s tests/binding_test.gd`. Expected: PASSED.
-- [ ] **Step 5: Commit** `feat(attributes): port Fractacular attribute/binding model (no Category, StringName sources)`.
+- [x] **Step 1: Write `tests/attribute_test.gd`.** Adapt `Fractacular/tests/attribute_test.gd`: drop the `category` arg (specs built with no category), drop `specs_in`/`copy_category_from`/`has_time_binding` assertions. Keep: `make` id→StringName, hard_min/max defaults, float clamp, wide hard range, wrap fold, INT round/clamp/step, BOOL/ENUM not bindable, ENUM keep/fallback, enum_values default to indices, show_when, table keeps specs, `ids()` ordered, `set_default` sanitizes + emits once + no-emit on same value, bindable rows have a Binding, `has_active_binding`, `duplicate` independent, `to_dict`/`apply_dict` round trip with an unknown id warned.
+- [x] **Step 2: Write `tests/binding_test.gd`.** Resolver: unbound float/int return default; `&"time"` reads t; a known axis id reads `axis_values[id]`; a missing axis id yields raw 0 (→ default); non-bindable returns default; the three waveforms at known points (as Fractacular's binding_test); sanitize applied (clamp to hard_max, wrap angle). Use `axis_values` dict form, e.g. `resolve(table, {&"a": 1.5}, 0.0)`.
+- [x] **Step 3: Create the four source files** (ports + rewrites above).
+- [x] **Step 4: Import + run.** `godot4 --headless --import --path <worktree>` then `godot4 --headless --path <worktree> -s tests/attribute_test.gd` and `-s tests/binding_test.gd`. Expected: PASSED.
+- [x] **Step 5: Commit** `feat(attributes): port Fractacular attribute/binding model (no Category, StringName sources)`.
 
 ---
 
@@ -150,11 +150,11 @@ static func waveform_value(raw: float, waveform: Binding.Waveform, period: float
 
 **InputMap registration** (in `Keymap`): on `add_axis`/`bind`, for each of pos/neg: `var action := StringName("axis_%s_pos" % id)`; if not `InputMap.has_action(action)` add it; `InputMap.action_erase_events(action)`; if key != KEY_NONE, make an `InputEventKey` with `physical_keycode = key` and `InputMap.action_add_event(action, ev)`. On `remove_axis`, erase both actions. Emit `changed` after edits.
 
-- [ ] **Step 1: Write `tests/axes_test.gd`.** Cover: `Axes.step(&"a", +1, 0.5)` with speed 1 → value 0.5; `set_value`; `values()` dict. Keymap: `add_axis` then `InputMap.has_action(&"axis_a_pos")` and event's `physical_keycode` == the key; `bind` re-points events; `set_speed`; `remove_axis` erases the actions and leaves a binding to it inert (resolver returns default — exercise via `BindingResolver.resolve` with the removed id); JSON round trip (`save_file`/`load_file` to a `user://` temp) preserves id/label/speed/keys by name; a missing file yields the default axis `a` with a warning. Controller: build a Keymap with axis `a`, an `AxisController` in the tree, `await hold(&"axis_a_pos", 0.5)` moves the axis > 0; with a `LineEdit` `grab_focus()` in a viewport passed to the controller, a `hold` does NOT move it. Use a temp keymap path so the shipped file is untouched.
-- [ ] **Step 2: Run → fail** (classes absent).
-- [ ] **Step 3: Create the five source files + `saves/keymap.json`.** `Clock._process`: `t += delta` (process mode inherits; the tree pause stops it). `AxisController._process(delta)`: `if TextFocus.any(_viewports): return` then for each pair strengths and `step`.
-- [ ] **Step 4: Import + run** `tests/axes_test.gd` → PASSED.
-- [ ] **Step 5: Commit** `feat(axes): virtual axes, keymap with InputMap actions, clock, text-focus helper`.
+- [x] **Step 1: Write `tests/axes_test.gd`.** Cover: `Axes.step(&"a", +1, 0.5)` with speed 1 → value 0.5; `set_value`; `values()` dict. Keymap: `add_axis` then `InputMap.has_action(&"axis_a_pos")` and event's `physical_keycode` == the key; `bind` re-points events; `set_speed`; `remove_axis` erases the actions and leaves a binding to it inert (resolver returns default — exercise via `BindingResolver.resolve` with the removed id); JSON round trip (`save_file`/`load_file` to a `user://` temp) preserves id/label/speed/keys by name; a missing file yields the default axis `a` with a warning. Controller: build a Keymap with axis `a`, an `AxisController` in the tree, `await hold(&"axis_a_pos", 0.5)` moves the axis > 0; with a `LineEdit` `grab_focus()` in a viewport passed to the controller, a `hold` does NOT move it. Use a temp keymap path so the shipped file is untouched.
+- [x] **Step 2: Run → fail** (classes absent).
+- [x] **Step 3: Create the five source files + `saves/keymap.json`.** `Clock._process`: `t += delta` (process mode inherits; the tree pause stops it). `AxisController._process(delta)`: `if TextFocus.any(_viewports): return` then for each pair strengths and `step`.
+- [x] **Step 4: Import + run** `tests/axes_test.gd` → PASSED.
+- [x] **Step 5: Commit** `feat(axes): virtual axes, keymap with InputMap actions, clock, text-focus helper`.
 
 ---
 
@@ -186,11 +186,11 @@ func apply_resolved(values: Dictionary) -> void:
 ```
 (Setters call `emit_changed`; blocking signals around `set()` keeps it to one emit. Verify `Resource.set_block_signals` suppresses `changed` — if not, write to a backing var map instead. Simplest robust form: store fields as plain `var` with explicit setters, and in `apply_resolved` assign the backing directly via `set`, guarding each setter with a `_suppress` flag.)
 
-- [ ] **Step 1: Rewrite `tests/fractal_params_test.gd`.** Defaults for every new field (box_scale −2.09, min_radius 0.7, fold_limit 1.0, fixed_radius 1.0, fold_order 0, w 0.0, julia_all false, c_0..3 = −0.23,1.512,1.892,0.0, iter_rot_* 0, color_mode 1, precision 2.5e-5). `COLOR_MODE_IDS`/names unchanged. `julia_point()` == Vector3(−0.23,1.512,1.892); `julia_enabled()` == false. `apply_resolved`: connect a counter to `changed`; apply a dict that differs → fires exactly once; apply the SAME dict again → does NOT fire; a partial dict sets only its keys.
-- [ ] **Step 2: Run → fail.**
-- [ ] **Step 3: Rewrite `fractal_params.gd`** with the new fields, `apply_resolved`, `julia_point()`, `julia_enabled()`.
-- [ ] **Step 4: Import + run** `tests/fractal_params_test.gd` → PASSED. (Other tests will be red until later tasks — that's expected.)
-- [ ] **Step 5: Commit** `feat(params): resolved Mandelbox knob fields, apply_resolved, julia helpers`.
+- [x] **Step 1: Rewrite `tests/fractal_params_test.gd`.** Defaults for every new field (box_scale −2.09, min_radius 0.7, fold_limit 1.0, fixed_radius 1.0, fold_order 0, w 0.0, julia_all false, c_0..3 = −0.23,1.512,1.892,0.0, iter_rot_* 0, color_mode 1, precision 2.5e-5). `COLOR_MODE_IDS`/names unchanged. `julia_point()` == Vector3(−0.23,1.512,1.892); `julia_enabled()` == false. `apply_resolved`: connect a counter to `changed`; apply a dict that differs → fires exactly once; apply the SAME dict again → does NOT fire; a partial dict sets only its keys.
+- [x] **Step 2: Run → fail.**
+- [x] **Step 3: Rewrite `fractal_params.gd`** with the new fields, `apply_resolved`, `julia_point()`, `julia_enabled()`.
+- [x] **Step 4: Import + run** `tests/fractal_params_test.gd` → PASSED. (Other tests will be red until later tasks — that's expected.)
+- [x] **Step 5: Commit** `feat(params): resolved Mandelbox knob fields, apply_resolved, julia helpers`.
 
 ---
 
@@ -205,11 +205,11 @@ func apply_resolved(values: Dictionary) -> void:
 
 Specs per the spec table. Groups in order: **Box** (`box_scale` default −2.09, min −5 max 3, hard ±6; `fold_limit` 1.0, 0..3; `min_radius` 0.7, 0..2; `fixed_radius` 1.0, 0..4; `fold_order` ENUM default 0, labels ["Box → Sphere","Sphere → Box"]; `w` FLOAT 0.0, −4..4), **Julia** (`julia_all` BOOL; `julia_0..3` BOOL; `c_0..3` FLOAT defaults −0.23,1.512,1.892,0.0, −4..4, each with `show_when` = its own toggle or `julia_all`), **Iteration rotation** (`iter_rot_xy,xz,xw,yz,yw,zw` FLOAT 0, −180..180, wrap), **Render** (`color_mode` ENUM default 1 — thirteen modes using `FractalParams.COLOR_MODE_NAMES` as labels and `COLOR_MODE_IDS` as enum_values, not bindable; `precision` FLOAT 2.5e-5, 1e-6..1e-3, log). Copy Mandelbox tooltip/effects from `Fractacular/src/fields/techniques/mandelbox.gd` for the shared knobs; write new tooltip/effects for `w`, `color_mode`, `precision`. `group_tooltips()` = Fractacular's three (Box/Julia/Iteration rotation) plus a "Render" entry. Note: spec uses `show_when` (collapse), matching the row's visibility; Fractacular used `enabled_when` — follow the spec and use `show_when` for the `c_i` rows.
 
-- [ ] **Step 1: Write `tests/mandelbox_shape_test.gd`.** Build the table; assert: every spec has non-empty `tooltip` and `effects`; every default is in `[hard_min, hard_max]` (FLOAT/INT); ids are unique; every distinct `group` has an entry in `group_tooltips()`; the set of ids equals the expected 23 catalogue ids; `color_mode` default 1 and its enum_values == `FractalParams.COLOR_MODE_IDS`; `box_scale` hard range ±6; `iter_rot_xy` wraps; `precision` is log. Add the shader-uniform-set check here OR in shader_test (Task 6) — do it in shader_test.
-- [ ] **Step 2: Run → fail.**
-- [ ] **Step 3: Create `mandelbox_shape.gd`.**
-- [ ] **Step 4: Import + run** → PASSED.
-- [ ] **Step 5: Commit** `feat(fractal): Mandelbox shape catalogue (ports Fractacular specs, adds w/color_mode/precision)`.
+- [x] **Step 1: Write `tests/mandelbox_shape_test.gd`.** Build the table; assert: every spec has non-empty `tooltip` and `effects`; every default is in `[hard_min, hard_max]` (FLOAT/INT); ids are unique; every distinct `group` has an entry in `group_tooltips()`; the set of ids equals the expected 23 catalogue ids; `color_mode` default 1 and its enum_values == `FractalParams.COLOR_MODE_IDS`; `box_scale` hard range ±6; `iter_rot_xy` wraps; `precision` is log. Add the shader-uniform-set check here OR in shader_test (Task 6) — do it in shader_test.
+- [x] **Step 2: Run → fail.**
+- [x] **Step 3: Create `mandelbox_shape.gd`.**
+- [x] **Step 4: Import + run** → PASSED.
+- [x] **Step 5: Commit** `feat(fractal): Mandelbox shape catalogue (ports Fractacular specs, adds w/color_mode/precision)`.
 
 ---
 
@@ -247,11 +247,11 @@ bool mb_rotating(){ return (abs(iter_rot_xy)+abs(iter_rot_xz)+abs(iter_rot_xw)+a
 `field(vec3 q)`: `vec4 z=vec4(0.0); vec4 c=vec4(q, w); float dz=1.0; bool rot=mb_rotating(); loop 16 iterations mb_step(z,dz,c,rot); return length(z) - 8.0 + noise_displace(q);` (dz ignored but passed).
 The Julia-marker normal branch in `fragment()` currently reads `julia_enabled`; change to `julia_all`.
 
-- [ ] **Step 1: Update `tests/shader_test.gd`** expected list to: `eye, cam_right, cam_up, cam_forward, tan_half_fov, aspect, box_half, box_scale, fold_limit, min_radius, fixed_radius, fold_order, w, julia_all, julia_0, julia_1, julia_2, julia_3, c_0, c_1, c_2, c_3, iter_rot_xy, iter_rot_xz, iter_rot_xw, iter_rot_yz, iter_rot_yw, iter_rot_zw, color_mode, precision`. Also assert the set of *shape* uniforms (minus the renderer-owned `eye, cam_right, cam_up, cam_forward, tan_half_fov, aspect, box_half`) equals `MandelboxShape.catalogue_ids()`.
-- [ ] **Step 2: Run → fail** (uniform mismatch).
-- [ ] **Step 3: Edit the shader.**
-- [ ] **Step 4: Import + run** `tests/shader_test.gd` → PASSED (shader compiles, uniform set matches).
-- [ ] **Step 5: Commit** `feat(shader): shared 4D Mandelbox step with fold order, iter rotation, per-component Julia, w`.
+- [x] **Step 1: Update `tests/shader_test.gd`** expected list to: `eye, cam_right, cam_up, cam_forward, tan_half_fov, aspect, box_half, box_scale, fold_limit, min_radius, fixed_radius, fold_order, w, julia_all, julia_0, julia_1, julia_2, julia_3, c_0, c_1, c_2, c_3, iter_rot_xy, iter_rot_xz, iter_rot_xw, iter_rot_yz, iter_rot_yw, iter_rot_zw, color_mode, precision`. Also assert the set of *shape* uniforms (minus the renderer-owned `eye, cam_right, cam_up, cam_forward, tan_half_fov, aspect, box_half`) equals `MandelboxShape.catalogue_ids()`.
+- [x] **Step 2: Run → fail** (uniform mismatch).
+- [x] **Step 3: Edit the shader.**
+- [x] **Step 4: Import + run** `tests/shader_test.gd` → PASSED (shader compiles, uniform set matches).
+- [x] **Step 5: Commit** `feat(shader): shared 4D Mandelbox step with fold order, iter rotation, per-component Julia, w`.
 
 ---
 
@@ -267,11 +267,11 @@ Note the spec's derivative identity: today's 24 fixtures used `scale=-2.09`/`-3`
 
 `FractalView._push_params` → push every new uniform: `box_scale, fold_limit, min_radius, fixed_radius, fold_order, w, julia_all, julia_0..3, c_0..3, iter_rot_*`, `color_mode`, `precision`, `tan_half_fov`, and `box_half = 20.0 if _params.julia_enabled() else 2.0`.
 
-- [ ] **Step 1: Add non-default fixtures to `distance_estimator_test.gd`.** Keep all 24 existing rows but rename the Julia block to set `j.julia_all=true; j.c_0=-0.23; j.c_1=1.512; j.c_2=1.892` (same expected values). Add a new block pinning: a positive scale (`box_scale=2.0`), Sphere→Box (`fold_order=1`), one iteration rotation (`iter_rot_xy=30`), a non-zero `w` (`w=0.5`), and a per-component Julia mix (`julia_0=true,julia_2=true`, c set). Compute each expected value ONCE from the CPU estimator and also assert it matches the shader via `shader_test`'s approach where possible; where headless cannot read pixels, pin the hand/CPU value with a comment that it was cross-checked. (Pragmatic: generate the expected numbers by running `estimate_at` once, paste them in, and additionally assert internal invariants: `fold_order` changes the result; a non-zero `w` changes it; symmetry breaks under rotation.)
-- [ ] **Step 2: Run → fail.**
-- [ ] **Step 3: Rewrite `distance_estimator.gd`; update `fractal_view.gd::_push_params`.**
-- [ ] **Step 4: Import + run** `tests/distance_estimator_test.gd` and `tests/fractal_view_test.gd` → PASSED. Also re-run `shader_test`.
-- [ ] **Step 5: Commit** `feat(fractal): 4D CPU estimator matching the shader; view pushes the new uniforms`.
+- [x] **Step 1: Add non-default fixtures to `distance_estimator_test.gd`.** Keep all 24 existing rows but rename the Julia block to set `j.julia_all=true; j.c_0=-0.23; j.c_1=1.512; j.c_2=1.892` (same expected values). Add a new block pinning: a positive scale (`box_scale=2.0`), Sphere→Box (`fold_order=1`), one iteration rotation (`iter_rot_xy=30`), a non-zero `w` (`w=0.5`), and a per-component Julia mix (`julia_0=true,julia_2=true`, c set). Compute each expected value ONCE from the CPU estimator and also assert it matches the shader via `shader_test`'s approach where possible; where headless cannot read pixels, pin the hand/CPU value with a comment that it was cross-checked. (Pragmatic: generate the expected numbers by running `estimate_at` once, paste them in, and additionally assert internal invariants: `fold_order` changes the result; a non-zero `w` changes it; symmetry breaks under rotation.)
+- [x] **Step 2: Run → fail.**
+- [x] **Step 3: Rewrite `distance_estimator.gd`; update `fractal_view.gd::_push_params`.**
+- [x] **Step 4: Import + run** `tests/distance_estimator_test.gd` and `tests/fractal_view_test.gd` → PASSED. Also re-run `shader_test`.
+- [x] **Step 5: Commit** `feat(fractal): 4D CPU estimator matching the shader; view pushes the new uniforms`.
 
 ---
 
@@ -293,11 +293,11 @@ Note the spec's derivative identity: today's 24 fixtures used `scale=-2.09`/`-3`
 
 **Movement pane** is new (model its refresh/teardown pattern on `Fractacular/src/ui/movement_window.gd`).
 
-- [ ] **Step 1: Write `tests/console_test.gd`.** Build table from `MandelboxShape`, a `Keymap` with the default axis (temp path), a `Clock`, a `ConsoleWindow`; add to tree; `await frames(1)`. Assert: inspector `row_count()` == specs count; editing a row's spin writes the table (`row(&"box_scale").spin_box().value = 1.0` → `table.get_default(&"box_scale")` ≈ 1.0); the source dropdown lists None, Time, Axis A; after `keymap.add_axis(&"b","Axis B",1,KEY_NONE,KEY_NONE)` the dropdown gains "Axis B" (console refreshed on `Keymap.changed`); `set_resolved({&"box_scale": 1.23})` with an active binding shows the readout; Movement pane: pressing "Add axis" calls `keymap.add_axis` (axis count grows), a `KeyCaptureButton` capture writes the key (`bind` called), remove button removes the axis; a `CtrlTap` down+up fed to the console emits `toggle_requested`.
-- [ ] **Step 2: Run → fail.**
-- [ ] **Step 3: Create the six source files.** `godot4 --headless --import` after.
-- [ ] **Step 4: Import + run** `tests/console_test.gd` → PASSED.
-- [ ] **Step 5: Commit** `feat(ui): console window — Shape inspector of binding rows and Movement pane of axes`.
+- [x] **Step 1: Write `tests/console_test.gd`.** Build table from `MandelboxShape`, a `Keymap` with the default axis (temp path), a `Clock`, a `ConsoleWindow`; add to tree; `await frames(1)`. Assert: inspector `row_count()` == specs count; editing a row's spin writes the table (`row(&"box_scale").spin_box().value = 1.0` → `table.get_default(&"box_scale")` ≈ 1.0); the source dropdown lists None, Time, Axis A; after `keymap.add_axis(&"b","Axis B",1,KEY_NONE,KEY_NONE)` the dropdown gains "Axis B" (console refreshed on `Keymap.changed`); `set_resolved({&"box_scale": 1.23})` with an active binding shows the readout; Movement pane: pressing "Add axis" calls `keymap.add_axis` (axis count grows), a `KeyCaptureButton` capture writes the key (`bind` called), remove button removes the axis; a `CtrlTap` down+up fed to the console emits `toggle_requested`.
+- [x] **Step 2: Run → fail.**
+- [x] **Step 3: Create the six source files.** `godot4 --headless --import` after.
+- [x] **Step 4: Import + run** `tests/console_test.gd` → PASSED.
+- [x] **Step 5: Commit** `feat(ui): console window — Shape inspector of binding rows and Movement pane of axes`.
 
 ---
 
@@ -322,11 +322,11 @@ Note the spec's derivative identity: today's 24 fixtures used `scale=-2.09`/`-3`
 
 Because callers now pass a table + axes, update signatures: `save_file(path, table, axes, params, camera, noise:={})`, `load_file(path, table, axes, params, camera) -> {ok,warnings,noise}`, `capture(...)`, `restore(...)`.
 
-- [ ] **Step 1: Rewrite `tests/workspace_test.gd` for v2.** Round trip: build a table (from MandelboxShape) with a couple of edited defaults and one active binding (`box_scale` → axis `a`, gain 0.5), an `Axes` with `a`=0.0, params prefs, a camera; save; load into fresh table/axes/params/camera; assert defaults, the binding (source `a`, gain 0.5, waveform, period), the axis value, the `fractal` prefs and camera all restore with no warnings; the file has `version==2` and sections `shape/axes/fractal/camera`. Unknown shape id warns; unknown axis id (value for an axis the keymap lacks) warns + dropped. A hand-written version-1 blob migrates (`scale`→`box_scale` etc.) with no warning. Every committed save loads cleanly with no warnings. Noise key round-trips; absence → null.
-- [ ] **Step 2: Run → fail.**
-- [ ] **Step 3: Rewrite `workspace.gd`; rewrite the four `saves/*.json` to version 2** (keep the same shape/camera content, expressed as the new ids; `noiseRidges.json` keeps its `noise` section). Verify each new file parses and loads with no warnings via a quick `-s` harness or the test.
-- [ ] **Step 4: Import + run** `tests/workspace_test.gd` → PASSED.
-- [ ] **Step 5: Commit** `feat(workspace): saved view version 2 (shape table + axes), version-1 migration`.
+- [x] **Step 1: Rewrite `tests/workspace_test.gd` for v2.** Round trip: build a table (from MandelboxShape) with a couple of edited defaults and one active binding (`box_scale` → axis `a`, gain 0.5), an `Axes` with `a`=0.0, params prefs, a camera; save; load into fresh table/axes/params/camera; assert defaults, the binding (source `a`, gain 0.5, waveform, period), the axis value, the `fractal` prefs and camera all restore with no warnings; the file has `version==2` and sections `shape/axes/fractal/camera`. Unknown shape id warns; unknown axis id (value for an axis the keymap lacks) warns + dropped. A hand-written version-1 blob migrates (`scale`→`box_scale` etc.) with no warning. Every committed save loads cleanly with no warnings. Noise key round-trips; absence → null.
+- [x] **Step 2: Run → fail.**
+- [x] **Step 3: Rewrite `workspace.gd`; rewrite the four `saves/*.json` to version 2** (keep the same shape/camera content, expressed as the new ids; `noiseRidges.json` keeps its `noise` section). Verify each new file parses and loads with no warnings via a quick `-s` harness or the test.
+- [x] **Step 4: Import + run** `tests/workspace_test.gd` → PASSED.
+- [x] **Step 5: Commit** `feat(workspace): saved view version 2 (shape table + axes), version-1 migration`.
 
 ---
 
@@ -351,12 +351,12 @@ Because callers now pass a table + axes, update signatures: `save_file(path, tab
 
 **main.tscn:** remove the `ControlsPanel` node and its ext_resource.
 
-- [ ] **Step 1: Rewrite `tests/main_test.gd`.** Replace all `panel` usage. Assert: console starts hidden, fly enabled; a Ctrl tap while captured frees the mouse and opens the console; a Ctrl tap while free closes it and recaptures; Ctrl+chord (S, and the Ctrl+P sharp case) does not toggle; a click in the view recaptures and leaves the console open; a bound axis (`table` binding `box_scale`→`a` gain 0.5) changes `params.box_scale` after `await hold(&"axis_a_pos", 0.5)`; Q and E are the default axis (`InputMap.has_action(&"axis_a_pos")`, its event is E); save/load round-trips through the pause menu's Save/Load signals (set a knob, save, change it, load, restored); the pause menu Camera row switches mode; Noise button opens the editor and resumes; WASD does not move the camera while a console text field has focus (grab focus on a console LineEdit, assert `fly.move_direction()` or camera position unchanged). Keep the Settings-sensitivity and noise-save-embeds-graph checks adapted to the new save signature.
-- [ ] **Step 2: Extend `tests/menus_test.gd`** for the new pause-menu rows (Save/Load/Camera/Noise/Fast Controls present and wired). Keep the main-menu + settings-sensitivity checks.
-- [ ] **Step 3: Run → fail.**
-- [ ] **Step 4: Edit `main.gd`, `main.tscn`, `pause_menu.gd`, `settings_menu.gd`;** delete controls panel files + test (use plain `rm` on the named files, never `rm -rf`). Remove ControlsPanel `class_name` references everywhere.
-- [ ] **Step 5: Import + run** `tests/main_test.gd`, `tests/menus_test.gd`, and the whole `tests/run_all.sh` → exit 0.
-- [ ] **Step 6: Commit** `feat(main): wire console/axes/clock; move panel contents to pause menu; delete Q panel`.
+- [x] **Step 1: Rewrite `tests/main_test.gd`.** Replace all `panel` usage. Assert: console starts hidden, fly enabled; a Ctrl tap while captured frees the mouse and opens the console; a Ctrl tap while free closes it and recaptures; Ctrl+chord (S, and the Ctrl+P sharp case) does not toggle; a click in the view recaptures and leaves the console open; a bound axis (`table` binding `box_scale`→`a` gain 0.5) changes `params.box_scale` after `await hold(&"axis_a_pos", 0.5)`; Q and E are the default axis (`InputMap.has_action(&"axis_a_pos")`, its event is E); save/load round-trips through the pause menu's Save/Load signals (set a knob, save, change it, load, restored); the pause menu Camera row switches mode; Noise button opens the editor and resumes; WASD does not move the camera while a console text field has focus (grab focus on a console LineEdit, assert `fly.move_direction()` or camera position unchanged). Keep the Settings-sensitivity and noise-save-embeds-graph checks adapted to the new save signature.
+- [x] **Step 2: Extend `tests/menus_test.gd`** for the new pause-menu rows (Save/Load/Camera/Noise/Fast Controls present and wired). Keep the main-menu + settings-sensitivity checks.
+- [x] **Step 3: Run → fail.**
+- [x] **Step 4: Edit `main.gd`, `main.tscn`, `pause_menu.gd`, `settings_menu.gd`;** delete controls panel files + test (use plain `rm` on the named files, never `rm -rf`). Remove ControlsPanel `class_name` references everywhere.
+- [x] **Step 5: Import + run** `tests/main_test.gd`, `tests/menus_test.gd`, and the whole `tests/run_all.sh` → exit 0.
+- [x] **Step 6: Commit** `feat(main): wire console/axes/clock; move panel contents to pause menu; delete Q panel`.
 
 ---
 
@@ -366,9 +366,9 @@ Because callers now pass a table + axes, update signatures: `save_file(path, tab
 
 Add under `[display]`: `window/subwindows/embed_subwindows=false`. This makes both the console and the noise window native (a monitor each); headless and web fall back to embedded automatically, so tests are unaffected. Remove the now-unused `toggle_panel` input action only if nothing references it (CtrlTap reads the raw Ctrl key, so `toggle_panel` can stay or go — leave it to minimise churn, or delete it and update any doc). 
 
-- [ ] **Step 1:** Add the setting; `godot4 --headless --import`.
-- [ ] **Step 2:** Run `tests/run_all.sh` → exit 0 (confirm `noise_window_test` and `console_test` still pass under the embed fallback).
-- [ ] **Step 3: Commit** `chore(project): native subwindows (console + noise on their own windows; embed fallback headless/web)`.
+- [x] **Step 1:** Add the setting; `godot4 --headless --import`.
+- [x] **Step 2:** Run `tests/run_all.sh` → exit 0 (confirm `noise_window_test` and `console_test` still pass under the embed fallback).
+- [x] **Step 3: Commit** `chore(project): native subwindows (console + noise on their own windows; embed fallback headless/web)`.
 
 ---
 
@@ -378,8 +378,8 @@ Add under `[display]`: `window/subwindows/embed_subwindows=false`. This makes bo
 
 Update README: controls table (Ctrl tap now opens the Console, not the panel; Q/E are the default Axis A; Shift sprint, Space/Backspace up/down), a new "Console" section (Shape inspector + binding model + Movement pane + keymap file), saved-view format v2 (shape table + axes + fractal + camera + noise), and the keymap file format. Update the systems viz text (in `docs/viz/panes/*.js` or data) only where it names keys or the Q panel — do NOT restructure the viz.
 
-- [ ] **Step 1:** Edit README sections. `grep -rn "Q panel\|controls panel\|toggle_panel\|Ctrl" README.md docs/viz` and fix each hit that is now wrong.
-- [ ] **Step 2:** Commit `docs: console, keymap, saved-view v2; update controls and keymap references`.
+- [x] **Step 1:** Edit README sections. `grep -rn "Q panel\|controls panel\|toggle_panel\|Ctrl" README.md docs/viz` and fix each hit that is now wrong.
+- [x] **Step 2:** Commit `docs: console, keymap, saved-view v2; update controls and keymap references`.
 
 ---
 
@@ -389,9 +389,9 @@ Update README: controls table (Ctrl tap now opens the Console, not the panel; Q/
 
 `default_view.png` MUST stay the identical picture (every knob at its default → identical uniforms → identical image; verify `_check_default` still PASS). Add `console_bound_axis`: build a table, bind Axis A → `box_scale` gain 0.5, set the axis value as if `axis_a_pos` held one second (axis value = 1×1s = 1.0 → box_scale resolves to −2.09 + 0.5×1.0 = −1.59), resolve, `params.apply_resolved(values)`, render, save PNG, and REQUIRE it differs from the default view image (reuse the `_check_noise`-style diff: assert diff fraction above a threshold vs the default render).
 
-- [ ] **Step 1:** Add the `console_bound_axis` block to `screenshots.gd` (render default first, then the bound-axis render, diff them, PASS only if different).
-- [ ] **Step 2:** Run `GODOT_APP=/Applications/Godot_mono.app tests/screenshots.sh` from the worktree. Expected: `PASS default_view`, `PASS console_bound_axis`, one `PASS mode_*` per colour mode. Capture the log lines for the report.
-- [ ] **Step 3: Commit** `test(screenshots): console_bound_axis differs from the unchanged default view`.
+- [x] **Step 1:** Add the `console_bound_axis` block to `screenshots.gd` (render default first, then the bound-axis render, diff them, PASS only if different).
+- [x] **Step 2:** Run `GODOT_APP=/Applications/Godot_mono.app tests/screenshots.sh` from the worktree. Expected: `PASS default_view`, `PASS console_bound_axis`, one `PASS mode_*` per colour mode. Capture the log lines for the report.
+- [x] **Step 3: Commit** `test(screenshots): console_bound_axis differs from the unchanged default view`.
 
 ---
 
