@@ -1,7 +1,8 @@
 extends "res://tests/test_case.gd"
-## The node catalogue: the registry finds every type in src/noise/nodes, every
-## type satisfies the shared schema, and the fifteen v1 types are present and
-## shaped correctly.
+## The node catalogue: the registry's preloaded list matches src/noise/nodes
+## exactly (an exported build cannot scan the directory, so the list is what
+## ships), every type satisfies the shared schema, and the fifteen v1 types are
+## present and shaped correctly.
 
 
 const V1_IDS := [
@@ -21,6 +22,29 @@ func run() -> void:
 	check_eq(NoisePort.glsl_type(NoisePort.Type.VEC3), "vec3", "VEC3 maps to the GLSL vec3")
 	check_eq(int(NoisePort.Type.FLOAT), 0, "FLOAT is 0 (saved graphs store these by index)")
 	check_eq(int(NoisePort.Type.VEC3), 1, "VEC3 is 1")
+
+	# ------------------------------------- the list matches the directory
+	# DirAccess works here because tests run from source; the registry itself
+	# must not depend on it, so a node file missing from the list fails here.
+	var listed: Array[String] = []
+	for script in NoiseNodeRegistry.NODE_SCRIPTS:
+		listed.append(script.resource_path)
+	var on_disk: Array[String] = []
+	for file_name in DirAccess.get_files_at(NoiseNodeRegistry.NODE_DIR):
+		if file_name.ends_with(".gd"):
+			on_disk.append("%s/%s" % [NoiseNodeRegistry.NODE_DIR, file_name])
+	on_disk.sort()
+	var missing := on_disk.filter(func(path: String) -> bool: return not listed.has(path))
+	var extra := listed.filter(func(path: String) -> bool: return not on_disk.has(path))
+	check(missing.is_empty() and extra.is_empty() and listed.size() == on_disk.size(),
+		"NODE_SCRIPTS lists exactly the %d .gd files in %s (missing %s, extra %s)"
+		% [on_disk.size(), NoiseNodeRegistry.NODE_DIR, missing, extra])
+	var listed_sorted := listed.duplicate()
+	listed_sorted.sort()
+	check(listed == listed_sorted, "NODE_SCRIPTS is kept in file-name order")
+	check_eq(NoiseNodeRegistry.all().size(), on_disk.size(), "all() instances one type per node file")
+	check(not FileAccess.get_file_as_string("res://src/noise/noise_node_registry.gd").contains("DirAccess."),
+		"the registry does not scan the directory (a .pck holds .gdc files)")
 
 	# ---------------------------------------------------------- the registry
 	var types := NoiseNodeRegistry.all()
