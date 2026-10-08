@@ -22,3 +22,12 @@ func run() -> void:
 	c.speed_factor = 2.0
 	check_eq(fired[0], 2, "both setters emitted changed")
 	check(c.eye().is_equal_approx(Vector3.ZERO), "transform setter moved the eye")
+
+	# assigning the value it already holds is not a change: stray input must not
+	# make the governor re-render a still view
+	var before: int = fired[0]
+	c.transform = c.transform
+	c.speed_factor = c.speed_factor
+	check_eq(fired[0], before, "re-assigning the same values emits nothing")
+	c.transform = c.transform.translated(Vector3(1e-7, 0, 0))
+	check_eq(fired[0], before + 1, "a deep-zoom move of 1e-7 still emits")
